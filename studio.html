@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoxCPM2 Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #18181f;
+    --bg4: #1e1e28;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.15);
+    --accent: #7c6ef7;
+    --accent2: #a78bfa;
+    --accent3: #c4b5fd;
+    --gold: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --text: #f1f0ff;
+    --text2: #9e9bb8;
+    --text3: #5c5875;
+    --font: 'Syne', sans-serif;
+    --mono: 'DM Mono', monospace;
+    --radius: 12px;
+    --radius2: 20px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; overflow-x: hidden; }
+
+  /* NOISE OVERLAY */
+  body::before { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); opacity: 0.4; pointer-events: none; z-index: 0; }
+
+  /* LAYOUT */
+  .app { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* NAV */
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; border-bottom: 1px solid var(--border); background: rgba(10,10,15,0.8); backdrop-filter: blur(20px); position: sticky; top: 0; z-index: 100; }
+  .logo { font-size: 1.1rem; font-weight: 800; letter-spacing: -0.02em; display: flex; align-items: center; gap: 8px; }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .nav-tabs { display: flex; gap: 4px; background: var(--bg3); border-radius: 10px; padding: 4px; }
+  .nav-tab { padding: 6px 16px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s; color: var(--text2); border: none; background: transparent; font-family: var(--font); }
+  .nav-tab.active { background: var(--accent); color: white; }
+  .nav-tab:hover:not(.active) { color: var(--text); background: var(--bg4); }
+
+  /* PAGES */
+  .page { display: none; padding: 2rem; max-width: 1400px; margin: 0 auto; width: 100%; }
+  .page.active { display: flex; gap: 2rem; }
+  .page-single { display: none; padding: 2rem; max-width: 900px; margin: 0 auto; width: 100%; flex-direction: column; gap: 1.5rem; }
+  .page-single.active { display: flex; }
+
+  /* CARDS */
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius2); padding: 1.5rem; }
+  .card-title { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text3); margin-bottom: 1rem; }
+
+  /* UPLOAD ZONE */
+  .upload-zone { border: 2px dashed var(--border2); border-radius: var(--radius2); padding: 3rem 2rem; text-align: center; cursor: pointer; transition: all 0.3s; position: relative; overflow: hidden; }
+  .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: rgba(124,110,247,0.05); }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { font-size: 3rem; margin-bottom: 1rem; }
+  .upload-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .upload-sub { font-size: 0.85rem; color: var(--text2); }
+
+  /* IMAGE GRID */
+  .image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; margin-top: 1rem; }
+  .img-thumb { position: relative; aspect-ratio: 16/9; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+  .img-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .img-thumb .remove-btn { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; background: rgba(239,68,68,0.9); border: none; color: white; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+  .img-count { font-size: 0.75rem; color: var(--text2); margin-top: 0.5rem; font-family: var(--mono); }
+
+  /* SETTINGS */
+  .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-label { font-size: 0.85rem; font-weight: 600; }
+  .setting-sub { font-size: 0.75rem; color: var(--text2); margin-top: 2px; }
+  select, input[type=range] { background: var(--bg3); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 6px 10px; font-family: var(--font); font-size: 0.8rem; cursor: pointer; }
+  select:focus { outline: none; border-color: var(--accent); }
+
+  /* BUTTONS */
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 10px; font-family: var(--font); font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: all 0.2s; border: none; text-decoration: none; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: var(--accent2); transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border2); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-gold { background: var(--gold); color: #1a1000; }
+  .btn-gold:hover { background: #fbbf24; transform: translateY(-1px); }
+  .btn-green { background: var(--green); color: white; }
+  .btn-green:hover { background: #34d399; transform: translateY(-1px); }
+  .btn-lg { padding: 14px 28px; font-size: 1rem; border-radius: 14px; }
+  .btn-full { width: 100%; justify-content: center; }
+
+  /* PROGRESS */
+  .progress-wrap { margin: 1rem 0; }
+  .progress-bar-bg { height: 4px; background: var(--bg4); border-radius: 2px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 2px; transition: width 0.3s; }
+  .progress-label { font-size: 0.75rem; color: var(--text2); margin-top: 6px; font-family: var(--mono); }
+
+  /* CANVAS VIDEO */
+  canvas { display: none; }
+  video { width: 100%; border-radius: var(--radius); border: 1px solid var(--border); background: #000; }
+
+  /* VOICE PAGE */
+  .voice-layout { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; align-items: start; }
+  .sidebar { position: sticky; top: 80px; display: flex; flex-direction: column; gap: 1rem; }
+
+  /* FORM ELEMENTS */
+  textarea { width: 100%; background: var(--bg3); border: 1px solid var(--border2); color: var(--text); border-radius: var(--radius); padding: 12px; font-family: var(--font); font-size: 0.9rem; resize: vertical; min-height: 100px; transition: border-color 0.2s; }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  .input-wrap { margin-bottom: 1rem; }
+  .input-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; display: block; }
+  input[type=file] { display: none; }
+  .file-upload-btn { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--bg3); border: 1px dashed var(--border2); border-radius: var(--radius); cursor: pointer; font-size: 0.85rem; color: var(--text2); transition: all 0.2s; }
+  .file-upload-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .audio-preview { margin-top: 8px; }
+  audio { width: 100%; border-radius: 8px; }
+
+  /* SLIDER */
+  .slider-wrap { display: flex; align-items: center; gap: 10px; }
+  .slider-wrap input[type=range] { flex: 1; border: none; padding: 0; background: transparent; }
+  .slider-val { font-size: 0.8rem; font-family: var(--mono); color: var(--accent2); min-width: 30px; text-align: right; }
+
+  /* TAGS */
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .tag { font-size: 0.72rem; padding: 4px 10px; border-radius: 20px; background: var(--bg3); border: 1px solid var(--border); color: var(--text2); cursor: pointer; transition: all 0.2s; font-weight: 600; }
+  .tag:hover { border-color: var(--accent); color: var(--accent); }
+  .tag.active { background: rgba(124,110,247,0.15); border-color: var(--accent); color: var(--accent2); }
+
+  /* OUTPUT */
+  .output-area { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; min-height: 120px; display: flex; align-items: center; justify-content: center; }
+  .output-empty { color: var(--text3); font-size: 0.85rem; text-align: center; }
+
+  /* STATUS */
+  .status-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; font-family: var(--mono); padding: 4px 10px; border-radius: 20px; }
+  .status-idle { background: var(--bg3); color: var(--text3); }
+  .status-running { background: rgba(124,110,247,0.15); color: var(--accent2); }
+  .status-done { background: rgba(16,185,129,0.15); color: var(--green); }
+  .status-err { background: rgba(239,68,68,0.15); color: var(--red); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .status-dot.spin { animation: spin-dot 1s linear infinite; }
+  @keyframes spin-dot { 0%,100%{opacity:1}50%{opacity:0.2} }
+
+  /* TOGGLE */
+  .toggle-wrap { display: flex; align-items: center; gap: 10px; }
+  .toggle { width: 40px; height: 22px; background: var(--bg4); border-radius: 11px; cursor: pointer; position: relative; transition: background 0.2s; border: 1px solid var(--border2); }
+  .toggle.on { background: var(--accent); border-color: var(--accent); }
+  .toggle::after { content: ''; width: 16px; height: 16px; border-radius: 50%; background: white; position: absolute; top: 2px; left: 2px; transition: transform 0.2s; }
+  .toggle.on::after { transform: translateX(18px); }
+  .toggle-label { font-size: 0.82rem; color: var(--text2); }
+
+  /* DIVIDER */
+  .divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+
+  /* SECTION HEADER */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .section-title { font-size: 1.1rem; font-weight: 800; }
+
+  /* VIDEO REVIEW */
+  .review-hero { aspect-ratio: 16/9; background: #000; border-radius: var(--radius2); overflow: hidden; position: relative; border: 1px solid var(--border); }
+  .review-hero video { width: 100%; height: 100%; object-fit: contain; }
+
+  /* ANIMATIONS */
+  @keyframes fadeIn { from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none} }
+  .fade-in { animation: fadeIn 0.4s ease forwards; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* MAIN COLUMN */
+  .main-col { flex: 1; display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; }
+
+  /* HELP TEXT */
+  .help { font-size: 0.78rem; color: var(--text3); margin-top: 4px; line-height: 1.5; }
+
+  /* TRANSITION PREVIEW */
+  .fx-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+  .fx-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; text-align: center; cursor: pointer; transition: all 0.2s; }
+  .fx-card.selected { border-color: var(--accent); background: rgba(124,110,247,0.1); }
+  .fx-card:hover:not(.selected) { border-color: var(--border2); }
+  .fx-name { font-size: 0.75rem; font-weight: 700; margin-top: 6px; }
+  .fx-sub { font-size: 0.65rem; color: var(--text3); margin-top: 2px; }
+  .fx-demo { height: 40px; border-radius: 6px; background: var(--bg4); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+</style>
+</head>
+<body>
+<canvas id="offscreen"></canvas>
+<div class="app">
+  <nav>
+    <div class="logo">
+      <div class="logo-dot"></div>
+      VoxCPM2 Studio
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="showPage('create')">⬡ Create</button>
+      <button class="nav-tab" id="tab-review" onclick="showPage('review')" style="display:none">▶ Review</button>
+      <button class="nav-tab" onclick="showPage('voice')">◎ Voice</button>
+    </div>
+    <div class="status-badge status-idle" id="global-status">
+      <div class="status-dot"></div>
+      Idle
+    </div>
+  </nav>
+
+  <!-- CREATE PAGE -->
+  <div class="page active" id="page-create">
+    <div class="main-col">
+      <div class="card fade-in">
+        <div class="section-header">
+          <div>
+            <div class="card-title">Step 1 — Upload Images</div>
+            <div class="section-title">Image Collection</div>
+          </div>
+          <div id="img-count-badge" class="status-badge status-idle">0 images</div>
+        </div>
+
+        <div class="upload-zone" id="upload-zone">
+          <input type="file" id="file-input" accept="image/*" multiple>
+          <div class="upload-icon">🖼</div>
+          <div class="upload-title">Drop images here</div>
+          <div class="upload-sub">or click to browse · PNG, JPG, WEBP supported</div>
+        </div>
+
+        <div class="image-grid" id="image-grid"></div>
+        <div class="img-count" id="img-count-text"></div>
+      </div>
+
+      <div class="card fade-in" style="animation-delay:0.1s">
+        <div class="card-title">Step 2 — Transition Effects</div>
+        <div class="section-title" style="margin-bottom:1rem">Visual Style</div>
+        <div class="fx-grid">
+          <div class="fx-card selected" data-fx="tectonic" onclick="selectFX(this)">
+            <div class="fx-demo" style="background:linear-gradient(135deg,#1a1a2e,#16213e)">
+              <div style="width:60%;height:60%;background:var(--accent);border-radius:4px;transform:skewX(-10deg)"></div>
+            </div>
+            <div class="fx-name">Tectonic</div>
+            <div class="fx-sub">Plate-shift wipe</div>
+          </div>
+          <div class="fx-card" data-fx="drift" onclick="selectFX(this)">
+            <div class="fx-demo" style="background:linear-gradient(135deg,#0d1117,#1a1a2e)">
+              <div style="width:70%;height:4px;background:var(--accent2);border-radius:2px;box-shadow:0 8px 0 var(--text3),0 16px 0 var(--text3)"></div>
+            </div>
+            <div class="fx-name">Drift</div>
+            <div class="fx-sub">Smooth pan flow</div>
+          </div>
+          <div class="fx-card" data-fx="pop" onclick="selectFX(this)">
+            <div class="fx-demo" style="background:linear-gradient(135deg,#0a0a0f,#18181f)">
+              <div style="width:50%;height:50%;background:var(--gold);border-radius:50%;opacity:0.8"></div>
+            </div>
+            <div class="fx-name">Pop</div>
+            <div class="fx-sub">Scale burst zoom</div>
+          </div>
+        </div>
+        <div style="margin-top:1rem">
+          <div class="setting-row">
+            <div><div class="setting-label">Transition Mode</div><div class="setting-sub">How effects are applied between slides</div></div>
+            <select id="fx-mode">
+              <option value="random">Random per slide</option>
+              <option value="tectonic">All Tectonic</option>
+              <option value="drift">All Drift</option>
+              <option value="pop">All Pop</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Duration per image</div><div class="setting-sub">Seconds each image is shown</div></div>
+            <div class="slider-wrap" style="width:160px">
+              <input type="range" min="2" max="10" value="5" id="img-duration" oninput="document.getElementById('dur-val').textContent=this.value+'s'">
+              <span class="slider-val" id="dur-val">5s</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Output resolution</div><div class="setting-sub">Video dimensions</div></div>
+            <select id="resolution">
+              <option value="1920x1080">1920 × 1080 (Full HD)</option>
+              <option value="1280x720">1280 × 720 (HD)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:1rem">
+        <button class="btn btn-primary btn-lg btn-full" id="generate-btn" onclick="generateVideo()" disabled>
+          ⬡ Generate MP4 Video
+        </button>
+      </div>
+
+      <div id="gen-progress" style="display:none" class="card fade-in">
+        <div class="card-title">Generating Video</div>
+        <div class="progress-wrap">
+          <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-fill" style="width:0%"></div></div>
+          <div class="progress-label" id="prog-label">Initializing...</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:320px;flex-shrink:0;display:flex;flex-direction:column;gap:1rem">
+      <div class="card fade-in" style="animation-delay:0.15s">
+        <div class="card-title">Output Preview</div>
+        <div class="output-area" id="preview-area">
+          <div class="output-empty">Video preview will appear here after generation</div>
+        </div>
+      </div>
+
+      <div class="card fade-in" style="animation-delay:0.2s">
+        <div class="card-title">Quick Guide</div>
+        <div style="font-size:0.8rem;color:var(--text2);line-height:1.8">
+          <div>① Upload 2+ images</div>
+          <div>② Choose transition style</div>
+          <div>③ Click Generate</div>
+          <div>④ Review & add voice</div>
+        </div>
+        <div class="divider"></div>
+        <div style="font-size:0.75rem;color:var(--text3)">Output: WebM/MP4 · 1920×1080 · H.264</div>
+      </div>
+
+      <div class="card fade-in" style="animation-delay:0.25s">
+        <div class="card-title">Transition Info</div>
+        <div style="font-size:0.8rem;color:var(--text2);line-height:1.8">
+          <div><span style="color:var(--accent2)">Tectonic</span> — Diagonal plate wipe</div>
+          <div><span style="color:var(--accent2)">Drift</span> — Horizontal pan slide</div>
+          <div><span style="color:var(--accent2)">Pop</span> — Scale zoom burst</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REVIEW PAGE -->
+  <div class="page-single" id="page-review">
+    <div class="card fade-in">
+      <div class="section-header">
+        <div>
+          <div class="card-title">Step 3 — Video Review</div>
+          <div class="section-title">Your Generated Video</div>
+        </div>
+        <div class="status-badge status-done"><div class="status-dot"></div>Ready</div>
+      </div>
+      <div class="review-hero">
+        <video id="review-video" controls></video>
+      </div>
+      <div style="display:flex;gap:1rem;margin-top:1.5rem;align-items:center">
+        <button class="btn btn-outline" onclick="downloadVideo()">⬇ Download Video</button>
+        <button class="btn btn-outline" onclick="showPage('create')">← Re-generate</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-gold btn-lg" onclick="goToVoice()">Go to Voice Generate ◎</button>
+      </div>
+    </div>
+
+    <div class="card fade-in" style="animation-delay:0.1s">
+      <div class="card-title">Video Details</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem">
+        <div style="background:var(--bg3);border-radius:var(--radius);padding:1rem;text-align:center">
+          <div style="font-size:1.5rem;font-weight:800;color:var(--accent2)" id="stat-images">0</div>
+          <div style="font-size:0.7rem;color:var(--text3);margin-top:4px">Images</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--radius);padding:1rem;text-align:center">
+          <div style="font-size:1.5rem;font-weight:800;color:var(--accent2)" id="stat-duration">0s</div>
+          <div style="font-size:0.7rem;color:var(--text3);margin-top:4px">Duration</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--radius);padding:1rem;text-align:center">
+          <div style="font-size:1.5rem;font-weight:800;color:var(--accent2)">1080p</div>
+          <div style="font-size:0.7rem;color:var(--text3);margin-top:4px">Resolution</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--radius);padding:1rem;text-align:center">
+          <div style="font-size:1.5rem;font-weight:800;color:var(--accent2)" id="stat-fx">—</div>
+          <div style="font-size:0.7rem;color:var(--text3);margin-top:4px">Effect</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VOICE PAGE -->
+  <div class="page" id="page-voice">
+    <div class="main-col">
+      <div class="card fade-in">
+        <div class="section-header">
+          <div>
+            <div class="card-title">VoxCPM2 · Voice Generation</div>
+            <div class="section-title">Text to Speech Studio</div>
+          </div>
+          <div class="status-badge status-idle" id="voice-status"><div class="status-dot"></div>Idle</div>
+        </div>
+
+        <div class="input-wrap">
+          <label class="input-label">✍ Target Text — content to speak</label>
+          <textarea id="target-text" rows="4" placeholder="Enter the text you want VoxCPM2 to speak...">VoxCPM2 is a creative multilingual TTS model, designed to generate highly realistic speech in 30 languages.</textarea>
+        </div>
+
+        <div class="input-wrap">
+          <label class="input-label">🎛 Control Instruction <span style="color:var(--text3);font-size:0.7rem;margin-left:6px">optional · describe the voice style</span></label>
+          <textarea id="control-instruction" rows="2" placeholder="e.g. A young woman, gentle and sweet voice / Khmer female voice, calm and clear"></textarea>
+          <div class="help">Describe gender, age, tone, emotion, pace. Supports English & Khmer.</div>
+
+          <div class="tags" id="preset-tags">
+            <div class="tag" onclick="applyPreset(this,'A young woman, gentle and sweet voice')">🌸 Gentle Woman</div>
+            <div class="tag" onclick="applyPreset(this,'Deep male voice, calm and authoritative')">🎙 Deep Male</div>
+            <div class="tag" onclick="applyPreset(this,'Energetic and fast-paced, enthusiastic')">⚡ Energetic</div>
+            <div class="tag" onclick="applyPreset(this,'Elderly wise voice, slow and thoughtful')">🌿 Wise Elder</div>
+            <div class="tag" onclick="applyPreset(this,'Khmer female voice, calm and clear')">🇰🇭 Khmer Female</div>
+            <div class="tag" onclick="applyPreset(this,'Khmer male voice, warm and friendly')">🇰🇭 Khmer Male</div>
+            <div class="tag" onclick="applyPreset(this,'Young cheerful voice, upbeat and friendly')">😊 Cheerful</div>
+            <div class="tag" onclick="applyPreset(this,'Professional news anchor voice, clear and neutral')">📰 Newscaster</div>
+            <div class="tag" onclick="applyPreset(this,'Soft storytelling voice, warm and immersive')">📖 Storyteller</div>
+            <div class="tag" onclick="applyPreset(this,'Slightly faster, cheerful tone')">🚀 Fast Cheerful</div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="input-wrap">
+          <label class="input-label">🎤 Reference Audio <span style="color:var(--text3);font-size:0.7rem;margin-left:6px">optional · upload for voice cloning</span></label>
+          <label class="file-upload-btn" for="ref-audio-input">
+            ⬆ Upload reference audio (WAV, MP3, OGG)
+          </label>
+          <input type="file" id="ref-audio-input" accept="audio/*" onchange="loadRefAudio(this)">
+          <div id="ref-audio-preview" class="audio-preview" style="display:none">
+            <audio id="ref-audio-player" controls></audio>
+            <div style="font-size:0.75rem;color:var(--text3);margin-top:4px" id="ref-audio-name"></div>
+          </div>
+          <div class="help">Upload 3–10 seconds of clean speech. The model will clone this voice's timbre.</div>
+        </div>
+
+        <div class="input-wrap">
+          <div class="toggle-wrap">
+            <div class="toggle" id="ultimate-toggle" onclick="toggleUltimate()"></div>
+            <span class="toggle-label">🎙 Ultimate Cloning Mode — transcript-guided cloning</span>
+          </div>
+          <div class="help" style="margin-top:6px">Reproduces every vocal nuance. Auto-transcribes reference audio. Disables Control Instruction when active.</div>
+        </div>
+
+        <div id="prompt-text-wrap" style="display:none" class="input-wrap">
+          <label class="input-label">Transcript of Reference Audio</label>
+          <textarea id="prompt-text" rows="2" placeholder="Enter or auto-detect the transcript of your reference audio..."></textarea>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="card-title" style="margin-bottom:1rem">⚙ Advanced Settings</div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">CFG Guidance Scale</div>
+            <div class="setting-sub">Higher → closer to prompt/reference · Lower → more creative</div>
+          </div>
+          <div class="slider-wrap" style="width:200px">
+            <input type="range" min="1" max="3" step="0.1" value="2.0" id="cfg-val" oninput="document.getElementById('cfg-display').textContent=parseFloat(this.value).toFixed(1)">
+            <span class="slider-val" id="cfg-display">2.0</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">LocDiT Flow Steps</div>
+            <div class="setting-sub">More steps → better quality, slower inference</div>
+          </div>
+          <div class="slider-wrap" style="width:200px">
+            <input type="range" min="1" max="50" step="1" value="10" id="dit-steps" oninput="document.getElementById('dit-display').textContent=this.value">
+            <span class="slider-val" id="dit-display">10</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div><div class="setting-label">Text Normalization</div><div class="setting-sub">Normalize numbers, dates, abbreviations</div></div>
+          <div class="toggle" id="normalize-toggle" onclick="this.classList.toggle('on')"></div>
+        </div>
+
+        <div class="setting-row">
+          <div><div class="setting-label">Reference Audio Denoiser</div><div class="setting-sub">ZipEnhancer noise suppression on reference</div></div>
+          <div class="toggle" id="denoise-toggle" onclick="this.classList.toggle('on')"></div>
+        </div>
+
+        <div style="margin-top:1.5rem;display:flex;gap:1rem">
+          <button class="btn btn-primary btn-lg" onclick="generateVoice()" id="voice-btn">
+            🔊 Generate Speech
+          </button>
+          <button class="btn btn-outline" onclick="resetVoice()">↺ Reset</button>
+        </div>
+
+        <div id="voice-progress" style="display:none;margin-top:1rem">
+          <div class="progress-wrap">
+            <div class="progress-bar-bg"><div class="progress-bar-fill" id="vprog-fill" style="width:0%"></div></div>
+            <div class="progress-label" id="vprog-label">Connecting to VoxCPM2...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card fade-in" style="animation-delay:0.1s">
+        <div class="section-header">
+          <div class="card-title">Generated Audio Output</div>
+          <div class="status-badge status-idle" id="output-status"><div class="status-dot"></div>Waiting</div>
+        </div>
+        <div class="output-area" id="audio-output-area">
+          <div class="output-empty">Generated audio will appear here</div>
+        </div>
+        <div id="audio-actions" style="display:none;margin-top:1rem;display:flex;gap:1rem;align-items:center">
+          <button class="btn btn-green" onclick="downloadAudio()">⬇ Download Audio</button>
+          <span style="font-size:0.75rem;color:var(--text3);font-family:var(--mono)" id="audio-meta"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div class="sidebar" style="width:320px;flex-shrink:0">
+      <div class="card fade-in" style="animation-delay:0.1s">
+        <div class="card-title">Your Video</div>
+        <div id="sidebar-video-wrap">
+          <div class="output-area" style="min-height:160px" id="sidebar-video-empty">
+            <div class="output-empty" style="font-size:0.75rem">Generate a video first on the Create page</div>
+          </div>
+        </div>
+        <div id="sidebar-video-player" style="display:none;margin-top:8px">
+          <video id="sidebar-video" controls style="border-radius:8px;width:100%"></video>
+          <div style="margin-top:8px;display:flex;gap:6px">
+            <button class="btn btn-outline" style="font-size:0.75rem;padding:6px 12px" onclick="showPage('review')">Full Review ↗</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card fade-in" style="animation-delay:0.15s">
+        <div class="card-title">30 Languages Supported</div>
+        <div class="tags" style="gap:4px">
+          <span class="tag" style="cursor:default">🇰🇭 Khmer</span>
+          <span class="tag" style="cursor:default">🇨🇳 Chinese</span>
+          <span class="tag" style="cursor:default">🇬🇧 English</span>
+          <span class="tag" style="cursor:default">🇯🇵 Japanese</span>
+          <span class="tag" style="cursor:default">🇰🇷 Korean</span>
+          <span class="tag" style="cursor:default">🇫🇷 French</span>
+          <span class="tag" style="cursor:default">🇩🇪 German</span>
+          <span class="tag" style="cursor:default">🇪🇸 Spanish</span>
+          <span class="tag" style="cursor:default">🇸🇦 Arabic</span>
+          <span class="tag" style="cursor:default">🇮🇳 Hindi</span>
+          <span class="tag" style="cursor:default">🇹🇭 Thai</span>
+          <span class="tag" style="cursor:default">🇻🇳 Vietnamese</span>
+          <span class="tag" style="cursor:default">+18 more</span>
+        </div>
+        <div class="help" style="margin-top:8px">No language tag needed — model auto-detects from input text.</div>
+      </div>
+
+      <div class="card fade-in" style="animation-delay:0.2s">
+        <div class="card-title">API Connection</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:0.8rem;font-family:var(--mono);color:var(--text2)">localhost:8808</div>
+          <div class="status-badge status-idle" id="api-status"><div class="status-dot"></div>Unknown</div>
+        </div>
+        <button class="btn btn-outline btn-full" style="font-size:0.8rem" onclick="checkAPI()">↺ Test Connection</button>
+        <div class="help" style="margin-top:8px">Make sure VoxCPM2 is running:<br><span style="font-family:var(--mono);color:var(--accent3)">python app.py --port 8808</span></div>
+      </div>
+
+      <div class="card fade-in" style="animation-delay:0.25s">
+        <div class="card-title">Voice Modes</div>
+        <div style="font-size:0.8rem;color:var(--text2);line-height:2">
+          <div>🎨 <strong style="color:var(--text)">Voice Design</strong> — describe only</div>
+          <div>🎛 <strong style="color:var(--text)">Controllable Clone</strong> — ref audio + style</div>
+          <div>🎙 <strong style="color:var(--text)">Ultimate Clone</strong> — ref + transcript</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8808';
+let images = [], videoBlob = null, selectedFX = 'tectonic', audioBlob = null, generatedVideoURL = null;
+
+function showPage(name) {
+  document.querySelectorAll('.page,.page-single').forEach(p=>p.classList.remove('active'));
+  const map = {create:'page-create',review:'page-review',voice:'page-voice'};
+  document.getElementById(map[name]).classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach((t,i)=>{
+    const tabs=['create','review','voice'];
+    t.classList.toggle('active', tabs[i]===name || (i===1 && name==='review'));
+  });
+  if(name==='voice' && generatedVideoURL) showSidebarVideo();
+}
+
+function selectFX(el) {
+  document.querySelectorAll('.fx-card').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedFX = el.dataset.fx;
+  document.getElementById('fx-mode').value = selectedFX;
+}
+
+// IMAGE UPLOAD
+const zone = document.getElementById('upload-zone');
+const fi = document.getElementById('file-input');
+zone.addEventListener('dragover', e=>{e.preventDefault();zone.classList.add('drag-over')});
+zone.addEventListener('dragleave', ()=>zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e=>{e.preventDefault();zone.classList.remove('drag-over');handleFiles(e.dataTransfer.files)});
+fi.addEventListener('change', e=>handleFiles(e.target.files));
+
+function handleFiles(files) {
+  Array.from(files).forEach(f=>{
+    if(!f.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      images.push({src:ev.target.result, name:f.name});
+      renderGrid();
+    };
+    reader.readAsDataURL(f);
+  });
+}
+
+function renderGrid() {
+  const grid = document.getElementById('image-grid');
+  grid.innerHTML = images.map((img,i)=>`
+    <div class="img-thumb">
+      <img src="${img.src}" alt="${img.name}">
+      <button class="remove-btn" onclick="removeImg(${i})">×</button>
+    </div>
+  `).join('');
+  const count = images.length;
+  document.getElementById('img-count-badge').textContent = count + ' image' + (count!==1?'s':'');
+  document.getElementById('img-count-badge').className = 'status-badge ' + (count>0?'status-running':'status-idle');
+  document.getElementById('img-count-text').textContent = count > 0 ? `${count} image${count!==1?'s':''} ready · ${(count*5)}s estimated duration` : '';
+  document.getElementById('generate-btn').disabled = count < 1;
+}
+
+function removeImg(i) { images.splice(i,1); renderGrid(); }
+
+// VIDEO GENERATION
+async function generateVideo() {
+  if(images.length < 1) return;
+  const btn = document.getElementById('generate-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Generating...';
+  document.getElementById('gen-progress').style.display='block';
+  setGlobalStatus('running','Generating video...');
+
+  const dur = parseInt(document.getElementById('img-duration').value);
+  const fxMode = document.getElementById('fx-mode').value;
+  const FPS = 30;
+  const W = 1920, H = 1080;
+  const transFrames = Math.floor(FPS * 0.8);
+  const holdFrames = Math.floor(FPS * (dur - 0.8));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Load all images
+  setProgress(5, 'Loading images...');
+  const loaded = await Promise.all(images.map(img => new Promise(res=>{
+    const i = new Image();
+    i.onload=()=>res(i);
+    i.src=img.src;
+  })));
+
+  setProgress(15, 'Starting encoder...');
+  const stream = canvas.captureStream(FPS);
+  const rec = new MediaRecorder(stream, {mimeType:'video/webm;codecs=vp9', videoBitsPerSecond:8000000});
+  const chunks = [];
+  rec.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
+
+  const fxTypes = ['tectonic','drift','pop'];
+  function getFX(idx) {
+    if(fxMode==='random') return fxTypes[Math.floor(Math.random()*3)];
+    return fxMode;
+  }
+
+  function drawCover(img, ctx, W, H) {
+    const r = Math.min(W/img.width, H/img.height);
+    const iW = img.width*r, iH = img.height*r;
+    ctx.drawImage(img, (W-iW)/2, (H-iH)/2, iW, iH);
+  }
+
+  function drawFrame(imgA, imgB, progress, fx, ctx, W, H) {
+    ctx.clearRect(0,0,W,H);
+    const ease = t => t<0.5 ? 2*t*t : -1+(4-2*t)*t;
+    const p = ease(Math.min(1, Math.max(0, progress)));
+
+    if(fx==='tectonic') {
+      // Tectonic: diagonal plate wipe
+      ctx.save();
+      ctx.beginPath();
+      const x = W*p;
+      ctx.rect(0,0,x,H);
+      ctx.clip();
+      ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+      drawCover(imgB,ctx,W,H);
+      ctx.restore();
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x,0,W-x,H);
+      ctx.clip();
+      ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+      drawCover(imgA,ctx,W,H);
+      // Tectonic line
+      ctx.restore();
+      ctx.save();
+      ctx.strokeStyle = `rgba(124,110,247,${0.8*(1-p)})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x-10,0); ctx.lineTo(x+10,H);
+      ctx.stroke();
+      ctx.restore();
+    } else if(fx==='drift') {
+      // Drift: pan slide
+      ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+      const offsetA = -W*p;
+      ctx.save();
+      ctx.translate(offsetA,0);
+      drawCover(imgA,ctx,W,H);
+      ctx.restore();
+      ctx.save();
+      ctx.translate(W-W*p,0);
+      drawCover(imgB,ctx,W,H);
+      ctx.restore();
+    } else if(fx==='pop') {
+      // Pop: scale zoom
+      ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+      const scaleB = 0.5 + 0.5*p;
+      const alphaA = 1-p;
+      ctx.save();
+      ctx.globalAlpha = alphaA;
+      drawCover(imgA,ctx,W,H);
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha = p;
+      ctx.translate(W/2,H/2);
+      ctx.scale(scaleB,scaleB);
+      ctx.translate(-W/2,-H/2);
+      drawCover(imgB,ctx,W,H);
+      ctx.restore();
+    }
+  }
+
+  rec.start(100);
+  setProgress(20, 'Rendering frames...');
+
+  const totalFrames = images.length * (holdFrames + transFrames) + holdFrames;
+  let frameCount = 0;
+
+  async function renderNextFrame(imgIdx, frameInSlide) {
+    if(imgIdx >= images.length) {
+      // Final hold on last image
+      for(let f=0;f<holdFrames;f++) {
+        ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+        drawCover(loaded[images.length-1],ctx,W,H);
+        await new Promise(r=>setTimeout(r,1000/FPS));
+      }
+      return;
+    }
+
+    if(frameInSlide < holdFrames) {
+      ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+      drawCover(loaded[imgIdx],ctx,W,H);
+      frameCount++;
+      const pct = 20 + 75*(frameCount/totalFrames);
+      setProgress(Math.min(95,pct), `Rendering slide ${imgIdx+1}/${images.length}...`);
+      await new Promise(r=>setTimeout(r,1000/FPS));
+      return renderNextFrame(imgIdx, frameInSlide+1);
+    } else {
+      const transFrame = frameInSlide - holdFrames;
+      if(transFrame < transFrames && imgIdx+1 < images.length) {
+        const p = transFrame/transFrames;
+        const fx = getFX(imgIdx);
+        drawFrame(loaded[imgIdx], loaded[imgIdx+1], p, fx, ctx, W, H);
+        frameCount++;
+        await new Promise(r=>setTimeout(r,1000/FPS));
+        return renderNextFrame(imgIdx, frameInSlide+1);
+      } else {
+        return renderNextFrame(imgIdx+1, 0);
+      }
+    }
+  }
+
+  await renderNextFrame(0,0);
+  setProgress(97, 'Finalizing...');
+  rec.stop();
+
+  await new Promise(r=>rec.onstop=r);
+  videoBlob = new Blob(chunks, {type:'video/webm'});
+  generatedVideoURL = URL.createObjectURL(videoBlob);
+
+  // Show preview
+  const previewArea = document.getElementById('preview-area');
+  previewArea.innerHTML = `<video src="${generatedVideoURL}" controls style="width:100%;border-radius:8px"></video>`;
+
+  // Setup review
+  document.getElementById('review-video').src = generatedVideoURL;
+  document.getElementById('stat-images').textContent = images.length;
+  document.getElementById('stat-duration').textContent = (images.length * dur) + 's';
+  document.getElementById('stat-fx').textContent = document.getElementById('fx-mode').options[document.getElementById('fx-mode').selectedIndex].text.split(' ')[0];
+
+  document.getElementById('tab-review').style.display='';
+  setProgress(100, 'Done!');
+  setGlobalStatus('done','Video ready');
+
+  setTimeout(()=>{
+    showPage('review');
+    btn.disabled=false;
+    btn.textContent='⬡ Generate MP4 Video';
+    document.getElementById('gen-progress').style.display='none';
+  }, 600);
+}
+
+function setProgress(pct, label) {
+  document.getElementById('prog-fill').style.width = pct+'%';
+  document.getElementById('prog-label').textContent = label;
+}
+
+function setGlobalStatus(type, text) {
+  const el = document.getElementById('global-status');
+  const dot = el.querySelector('.status-dot');
+  el.className = 'status-badge status-'+type;
+  dot.className = 'status-dot' + (type==='running'?' spin':'');
+  el.innerHTML = `<div class="status-dot${type==='running'?' spin':''}"></div> ${text}`;
+}
+
+function downloadVideo() {
+  if(!videoBlob) return;
+  const a = document.createElement('a'); a.href=generatedVideoURL; a.download='voxcpm2_video.webm'; a.click();
+}
+
+function goToVoice() {
+  showPage('voice');
+  if(generatedVideoURL) showSidebarVideo();
+}
+
+function showSidebarVideo() {
+  document.getElementById('sidebar-video-empty').style.display='none';
+  document.getElementById('sidebar-video-player').style.display='block';
+  document.getElementById('sidebar-video').src = generatedVideoURL;
+}
+
+// VOICE GENERATION
+function toggleUltimate() {
+  const t = document.getElementById('ultimate-toggle');
+  t.classList.toggle('on');
+  const on = t.classList.contains('on');
+  document.getElementById('prompt-text-wrap').style.display = on ? 'block' : 'none';
+  document.getElementById('control-instruction').disabled = on;
+  if(on) document.getElementById('control-instruction').style.opacity='0.3';
+  else document.getElementById('control-instruction').style.opacity='1';
+}
+
+function applyPreset(el, text) {
+  document.querySelectorAll('#preset-tags .tag').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('control-instruction').value = text;
+}
+
+function loadRefAudio(input) {
+  const file = input.files[0];
+  if(!file) return;
+  const url = URL.createObjectURL(file);
+  document.getElementById('ref-audio-player').src = url;
+  document.getElementById('ref-audio-preview').style.display='block';
+  document.getElementById('ref-audio-name').textContent = file.name + ' · ' + (file.size/1024).toFixed(0) + 'KB';
+  input._file = file;
+}
+
+async function checkAPI() {
+  const el = document.getElementById('api-status');
+  el.className='status-badge status-running';
+  el.innerHTML='<div class="status-dot spin"></div> Checking...';
+  try {
+    const r = await fetch(API+'/gradio_api/info', {signal:AbortSignal.timeout(5000)});
+    if(r.ok) {
+      el.className='status-badge status-done';
+      el.innerHTML='<div class="status-dot"></div> Connected';
+    } else throw new Error();
+  } catch(e) {
+    el.className='status-badge status-err';
+    el.innerHTML='<div class="status-dot"></div> Offline';
+  }
+}
+
+async function generateVoice() {
+  const text = document.getElementById('target-text').value.trim();
+  if(!text) return alert('Please enter target text');
+
+  const btn = document.getElementById('voice-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Generating...';
+  document.getElementById('voice-progress').style.display='block';
+  setVoiceStatus('running','Generating...');
+  setVProg(10,'Connecting to VoxCPM2...');
+
+  const ctrl = document.getElementById('control-instruction').value;
+  const usePrompt = document.getElementById('ultimate-toggle').classList.contains('on');
+  const promptText = document.getElementById('prompt-text').value;
+  const cfgVal = parseFloat(document.getElementById('cfg-val').value);
+  const ditSteps = parseInt(document.getElementById('dit-steps').value);
+  const doNorm = document.getElementById('normalize-toggle').classList.contains('on');
+  const denoise = document.getElementById('denoise-toggle').classList.contains('on');
+  const refInput = document.getElementById('ref-audio-input');
+  const refFile = refInput._file || null;
+
+  try {
+    setVProg(20,'Uploading audio...');
+    let refWav = null;
+    if(refFile) {
+      const fd = new FormData();
+      fd.append('files', refFile);
+      const uploadRes = await fetch(API+'/gradio_api/upload', {method:'POST', body:fd});
+      if(uploadRes.ok) {
+        const paths = await uploadRes.json();
+        refWav = {path:paths[0], meta:{_type:'gradio.FileData'}, orig_name:refFile.name};
+      }
+    }
+
+    setVProg(40,'Sending to model...');
+    const payload = {
+      text, control_instruction: ctrl,
+      ref_wav: refWav,
+      use_prompt_text: usePrompt,
+      prompt_text_value: promptText,
+      cfg_value: cfgVal,
+      do_normalize: doNorm,
+      denoise: denoise,
+      dit_steps: ditSteps
+    };
+
+    const initRes = await fetch(API+'/gradio_api/call/v2/generate', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+
+    if(!initRes.ok) throw new Error('API call failed: '+initRes.status);
+    const {event_id} = await initRes.json();
+
+    setVProg(60,'Model is generating speech...');
+
+    // Poll SSE
+    const evtRes = await fetch(API+'/gradio_api/call/generate/'+event_id);
+    const reader = evtRes.body.getReader();
+    const dec = new TextDecoder();
+    let result = null;
+    let buf = '';
+
+    while(true) {
+      const {done, value} = await reader.read();
+      if(done) break;
+      buf += dec.decode(value, {stream:true});
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for(const line of lines) {
+        if(line.startsWith('data:')) {
+          try {
+            const data = JSON.parse(line.slice(5));
+            if(Array.isArray(data) && data[0]?.url) {
+              result = data[0];
+            }
+          } catch(e){}
+        }
+      }
+    }
+
+    setVProg(90,'Processing output...');
+
+    if(result) {
+      const audioURL = result.url || (API + '/gradio_api/file=' + result.path);
+      const outArea = document.getElementById('audio-output-area');
+      outArea.innerHTML = `
+        <div style="width:100%">
+          <audio controls style="width:100%;border-radius:8px" id="gen-audio">
+            <source src="${audioURL}">
+          </audio>
+          <div style="font-size:0.75rem;color:var(--text3);margin-top:8px;font-family:var(--mono)">
+            Generated · ${new Date().toLocaleTimeString()} · CFG ${cfgVal} · ${ditSteps} steps
+          </div>
+        </div>`;
+      document.getElementById('audio-actions').style.display='flex';
+      document.getElementById('output-status').className='status-badge status-done';
+      document.getElementById('output-status').innerHTML='<div class="status-dot"></div>Ready';
+      const r = await fetch(audioURL);
+      audioBlob = await r.blob();
+    } else {
+      throw new Error('No audio in response');
+    }
+
+    setVProg(100,'Done!');
+    setVoiceStatus('done','Speech ready');
+  } catch(e) {
+    setVoiceStatus('err','Error: '+e.message);
+    setVProg(0,'Failed: '+e.message);
+    document.getElementById('audio-output-area').innerHTML=`<div class="output-empty" style="color:var(--red)">⚠ ${e.message}<br><span style="font-size:0.75rem;color:var(--text3)">Make sure VoxCPM2 is running on port 8808</span></div>`;
+  }
+
+  btn.disabled=false;
+  btn.textContent='🔊 Generate Speech';
+  setTimeout(()=>document.getElementById('voice-progress').style.display='none',2000);
+}
+
+function setVProg(pct, label) {
+  document.getElementById('vprog-fill').style.width=pct+'%';
+  document.getElementById('vprog-label').textContent=label;
+}
+
+function setVoiceStatus(type, text) {
+  const el=document.getElementById('voice-status');
+  el.className='status-badge status-'+type;
+  el.innerHTML=`<div class="status-dot${type==='running'?' spin':''}"></div> ${text}`;
+}
+
+function downloadAudio() {
+  if(!audioBlob) return;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(audioBlob);
+  a.download='voxcpm2_output.wav';
+  a.click();
+}
+
+function resetVoice() {
+  document.getElementById('target-text').value='';
+  document.getElementById('control-instruction').value='';
+  document.getElementById('ref-audio-input').value='';
+  document.getElementById('ref-audio-preview').style.display='none';
+  document.getElementById('audio-output-area').innerHTML='<div class="output-empty">Generated audio will appear here</div>';
+  document.getElementById('audio-actions').style.display='none';
+  document.getElementById('ultimate-toggle').classList.remove('on');
+  document.getElementById('normalize-toggle').classList.remove('on');
+  document.getElementById('denoise-toggle').classList.remove('on');
+  document.getElementById('prompt-text-wrap').style.display='none';
+  document.querySelectorAll('#preset-tags .tag').forEach(t=>t.classList.remove('active'));
+  setVoiceStatus('idle','Idle');
+  document.getElementById('output-status').className='status-badge status-idle';
+  document.getElementById('output-status').innerHTML='<div class="status-dot"></div>Waiting';
+  document.getElementById('ref-audio-input')._file = null;
+}
+
+checkAPI();
+</script>
+</body>
+</html>
