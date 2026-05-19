@@ -197,8 +197,6 @@
   .img-thumb[draggable=true]:active { cursor: grabbing; }
   .img-thumb.drag-target { border: 2px solid var(--accent) !important; transform: scale(1.05); box-shadow: 0 0 16px rgba(124,110,247,0.4); transition: transform 0.15s; }
 
-  /* I2V CARD */
-  .i2v-item { padding: 10px 12px; background: var(--bg3); border-radius: var(--radius); border: 1px solid var(--border); transition: border-color 0.3s; }
 </style>
 </head>
 <body>
@@ -246,7 +244,7 @@
       <div class="card fade-in" style="animation-delay:0.1s">
         <div class="card-title">Step 2 — Transition Effects</div>
         <div class="section-title" style="margin-bottom:1rem">Visual Style</div>
-        <div class="fx-grid">
+        <div class="fx-grid" style="grid-template-columns:repeat(4,1fr)">
           <div class="fx-card selected" data-fx="tectonic" onclick="selectFX(this)">
             <div class="fx-demo" style="background:linear-gradient(135deg,#1a1a2e,#16213e)">
               <div style="width:60%;height:60%;background:var(--accent);border-radius:4px;transform:skewX(-10deg)"></div>
@@ -268,6 +266,43 @@
             <div class="fx-name">Pop</div>
             <div class="fx-sub">Scale burst zoom</div>
           </div>
+          <div class="fx-card" data-fx="fade" onclick="selectFX(this)">
+            <div class="fx-demo" style="background:linear-gradient(135deg,#0a0a0f,#1a1a2e)">
+              <div style="width:100%;height:100%;background:linear-gradient(90deg,var(--accent) 0%,transparent 100%);opacity:0.6"></div>
+            </div>
+            <div class="fx-name">Fade</div>
+            <div class="fx-sub">Cross-dissolve</div>
+          </div>
+          <div class="fx-card" data-fx="slideup" onclick="selectFX(this)">
+            <div class="fx-demo" style="background:linear-gradient(135deg,#0d1117,#18181f);display:flex;flex-direction:column;justify-content:flex-end">
+              <div style="width:100%;height:55%;background:var(--accent2);border-radius:4px 4px 0 0"></div>
+            </div>
+            <div class="fx-name">Slide Up</div>
+            <div class="fx-sub">Rise from below</div>
+          </div>
+          <div class="fx-card" data-fx="zoomout" onclick="selectFX(this)">
+            <div class="fx-demo" style="background:linear-gradient(135deg,#0a0a0f,#16213e);position:relative">
+              <div style="position:absolute;inset:25%;background:var(--green);border-radius:4px;opacity:0.7"></div>
+              <div style="position:absolute;inset:8%;background:transparent;border:2px solid var(--green);border-radius:6px;opacity:0.4"></div>
+            </div>
+            <div class="fx-name">Zoom Out</div>
+            <div class="fx-sub">Shrink reveal</div>
+          </div>
+          <div class="fx-card" data-fx="split" onclick="selectFX(this)">
+            <div class="fx-demo" style="background:linear-gradient(135deg,#0d1117,#1a1a2e);display:flex;gap:3px">
+              <div style="flex:1;background:var(--accent);opacity:0.7;border-radius:3px 0 0 3px"></div>
+              <div style="flex:1;background:var(--accent);opacity:0.7;border-radius:0 3px 3px 0"></div>
+            </div>
+            <div class="fx-name">Split</div>
+            <div class="fx-sub">Door open wipe</div>
+          </div>
+          <div class="fx-card" data-fx="burn" onclick="selectFX(this)">
+            <div class="fx-demo" style="background:linear-gradient(135deg,#1a0a00,#2e1500)">
+              <div style="width:60%;height:60%;background:linear-gradient(135deg,#f59e0b,#ef4444);border-radius:50% 40% 60% 30%;opacity:0.85"></div>
+            </div>
+            <div class="fx-name">Burn</div>
+            <div class="fx-sub">Brightness sweep</div>
+          </div>
         </div>
         <div style="margin-top:1rem">
           <div class="setting-row">
@@ -277,6 +312,11 @@
               <option value="tectonic">All Tectonic</option>
               <option value="drift">All Drift</option>
               <option value="pop">All Pop</option>
+              <option value="fade">All Fade</option>
+              <option value="slideup">All Slide Up</option>
+              <option value="zoomout">All Zoom Out</option>
+              <option value="split">All Split</option>
+              <option value="burn">All Burn</option>
             </select>
           </div>
           <div class="setting-row">
@@ -295,45 +335,6 @@
               <option value="1080x1350">📲 1080 × 1350 — Portrait 4:5 (Facebook / LinkedIn Feed)</option>
             </select>
           </div>
-        </div>
-      </div>
-
-      <!-- AI IMAGE TO VIDEO (FAL.ai WAN 2.1) -->
-      <div class="card fade-in" id="i2v-card" style="animation-delay:0.15s;border:1px solid rgba(124,110,247,0.25)">
-        <div class="section-header">
-          <div>
-            <div class="card-title" style="color:var(--accent2)">✦ AI Image to Video <span style="color:var(--text3);font-weight:400">· LTX Video · via FAL.ai</span></div>
-            <div class="section-title" style="font-size:0.95rem">Convert Each Image → 5s Video</div>
-          </div>
-          <div class="status-badge status-idle" id="i2v-status"><div class="status-dot"></div>Idle</div>
-        </div>
-        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:0.9rem;margin-bottom:1rem">
-          <div style="font-size:0.78rem;font-weight:700;color:var(--accent2);margin-bottom:5px">How it works</div>
-          <div style="font-size:0.75rem;color:var(--text2);line-height:1.7">Each uploaded image is sent to <strong style="color:var(--text)">LTX Video</strong> (hosted on FAL.ai) which generates a <strong style="color:var(--text)">~5-second video clip</strong> per image in <strong style="color:var(--green)">~20–40 seconds</strong> — the fastest model on FAL.ai, same key.</div>
-          <div style="margin-top:6px;font-size:0.73rem;color:var(--text3)">Get a free key: fal.ai → Sign up → Dashboard → API Keys</div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-          <div>
-            <label class="input-label">FAL.ai API Key</label>
-            <div style="position:relative">
-              <input type="password" id="fal-key" placeholder="xxxxxx:yyyyyy..." style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:7px 32px 7px 10px;font-size:0.78rem;font-family:var(--mono)">
-              <span onclick="toggleFalKeyVis()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:0.82rem" id="fal-key-eye">👁</span>
-            </div>
-          </div>
-          <div>
-            <label class="input-label">Motion Prompt <span style="color:var(--text3)">(optional)</span></label>
-            <input type="text" id="i2v-prompt" value="camera tilt horizontal" style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:7px 10px;font-size:0.78rem;font-family:var(--font)">
-          </div>
-        </div>
-        <button class="btn btn-primary btn-full" id="i2v-btn" onclick="batchImageToVideo()" disabled>
-          🎬 Generate 5s Videos from Images
-        </button>
-        <div id="i2v-progress" style="display:none;margin-top:1rem">
-          <div class="progress-wrap">
-            <div class="progress-bar-bg"><div class="progress-bar-fill" id="i2v-prog-fill" style="width:0%"></div></div>
-            <div class="progress-label" id="i2v-prog-label">Initializing...</div>
-          </div>
-          <div id="i2v-items" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
         </div>
       </div>
 
@@ -1041,8 +1042,6 @@ function renderGrid() {
     ? `${total} file${total!==1?'s':''} ready · ~${Math.round(estSec)}s estimated · images auto-enhanced ✨`
     : '';
   document.getElementById('generate-btn').disabled = total < 1;
-  const i2vBtn = document.getElementById('i2v-btn');
-  if (i2vBtn) i2vBtn.disabled = mediaItems.filter(m => m.type === 'image').length < 1;
 }
 
 function removeMedia(i) { mediaItems.splice(i,1); renderGrid(); }
@@ -1182,8 +1181,8 @@ async function generateVideo() {
   const chunks = [];
   rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
-  const fxTypes = ['tectonic','drift','pop'];
-  const getFX   = () => fxMode==='random' ? fxTypes[Math.floor(Math.random()*3)] : fxMode;
+  const fxTypes = ['tectonic','drift','pop','fade','slideup','zoomout','split','burn'];
+  const getFX   = () => fxMode==='random' ? fxTypes[Math.floor(Math.random()*fxTypes.length)] : fxMode;
 
   function drawCover(el) {
     const w = el.videoWidth  || el.naturalWidth  || el.width  || W;
@@ -1208,12 +1207,30 @@ async function generateVideo() {
       ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
       ctx.save(); ctx.translate(-W*ep,0); drawCover(elA); ctx.restore();
       ctx.save(); ctx.translate(W*(1-ep),0); drawCover(elB); ctx.restore();
-    } else { // pop / fade
+    } else if (fx === 'pop') {
       ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
       ctx.save(); ctx.globalAlpha=1-ep; drawCover(elA); ctx.restore();
       ctx.save(); ctx.globalAlpha=ep;
       ctx.translate(W/2,H/2); ctx.scale(0.5+0.5*ep,0.5+0.5*ep); ctx.translate(-W/2,-H/2);
       drawCover(elB); ctx.restore();
+    } else if (fx === 'fade') {
+      drawCover(elA);
+      ctx.save(); ctx.globalAlpha=ep; drawCover(elB); ctx.restore();
+    } else if (fx === 'slideup') {
+      drawCover(elA);
+      ctx.save(); ctx.beginPath(); ctx.rect(0, H*(1-ep), W, H*ep); ctx.clip(); drawCover(elB); ctx.restore();
+    } else if (fx === 'zoomout') {
+      const s = 1 + 0.3*(1-ep);
+      ctx.save(); ctx.translate(W/2,H/2); ctx.scale(s,s); ctx.translate(-W/2,-H/2); drawCover(elA); ctx.restore();
+      ctx.save(); ctx.globalAlpha=ep; drawCover(elB); ctx.restore();
+    } else if (fx === 'split') {
+      drawCover(elB);
+      ctx.save(); ctx.beginPath(); ctx.rect(0,0,W/2*(1-ep),H); ctx.clip(); drawCover(elA); ctx.restore();
+      ctx.save(); ctx.beginPath(); ctx.rect(W-W/2*(1-ep),0,W/2*(1-ep),H); ctx.clip(); drawCover(elA); ctx.restore();
+    } else { // burn
+      drawCover(elA);
+      ctx.save(); ctx.globalAlpha=ep; ctx.fillStyle=`rgba(255,${Math.round(120*(1-ep))},0,${ep*0.6})`; ctx.fillRect(0,0,W,H); ctx.restore();
+      ctx.save(); ctx.globalAlpha=ep; drawCover(elB); ctx.restore();
     }
     // Frame overlay on top of transition too
     if (frameOverlayImg) ctx.drawImage(frameOverlayImg, 0, 0, W, H);
@@ -2072,197 +2089,12 @@ async function encodeMP3(audioBuffer) {
   return new Blob(mp3Data, { type: 'audio/mpeg' });
 }
 
-// ─── AI IMAGE TO VIDEO (FAL.ai WAN 2.1) ─────────────────────────────────────
-let falKey = '';
 
-function loadFalSettings() {
-  falKey = sessionStorage.getItem('fal_key') || '';
-  if (falKey) document.getElementById('fal-key').value = falKey;
-}
-
-function toggleFalKeyVis() {
-  const inp = document.getElementById('fal-key');
-  const eye = document.getElementById('fal-key-eye');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-  eye.textContent = inp.type === 'password' ? '👁' : '🙈';
-}
-
-async function batchImageToVideo() {
-  falKey = document.getElementById('fal-key').value.trim();
-  if (!falKey) return alert('Please enter your FAL.ai API key.\n\nGet a free key at fal.ai → Dashboard → API Keys');
-
-  const imgItems = mediaItems.map((m, i) => ({item: m, idx: i})).filter(({item}) => item.type === 'image' && item.src);
-  if (!imgItems.length) return alert('Upload at least one image first.');
-
-  sessionStorage.setItem('fal_key', falKey);
-
-  const btn = document.getElementById('i2v-btn');
-  btn.disabled = true; btn.textContent = '⏳ Processing...';
-  document.getElementById('i2v-progress').style.display = 'block';
-  setI2VStatus('running', `Converting ${imgItems.length} image${imgItems.length > 1 ? 's' : ''}...`);
-
-  const prompt = (document.getElementById('i2v-prompt').value || '').trim() || 'camera tilt horizontal';
-  const itemsDiv = document.getElementById('i2v-items');
-  itemsDiv.innerHTML = imgItems.map(({item, idx}) =>
-    `<div class="i2v-item" id="i2v-item-${idx}">
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:0.78rem;font-weight:700;color:var(--text2)">${item.name}</span>
-        <div class="status-badge status-idle" id="i2v-item-st-${idx}"><div class="status-dot"></div>Queued</div>
-      </div>
-    </div>`
-  ).join('');
-
-  let done = 0;
-  for (const {item, idx} of imgItems) {
-    const stBadge = document.getElementById(`i2v-item-st-${idx}`);
-    const itemEl  = document.getElementById(`i2v-item-${idx}`);
-    setI2VBadge(stBadge, 'running', 'Sending...');
-    setI2VProg(Math.round(done / imgItems.length * 90), `Image ${done + 1}/${imgItems.length}: ${item.name}`);
-    try {
-      const videoUrl = await callFalWan(item.src, prompt, stBadge);
-      setI2VBadge(stBadge, 'running', 'Downloading...');
-      const res = await fetch(videoUrl);
-      const blob = await res.blob();
-      const blobURL = URL.createObjectURL(blob);
-      const tmpVid = document.createElement('video');
-      tmpVid.src = blobURL; tmpVid.muted = true;
-      await new Promise(r => { tmpVid.onloadedmetadata = r; setTimeout(r, 2000); tmpVid.load(); });
-      mediaItems[idx] = {
-        type: 'video',
-        src: blobURL,
-        name: item.name.replace(/\.(png|jpe?g|webp|gif)$/i, '_ai.mp4'),
-        blob,
-        enhanced: false,
-        duration: tmpVid.duration || 5
-      };
-      setI2VBadge(stBadge, 'done', '✓ Done');
-      if (itemEl) itemEl.style.borderColor = 'var(--green)';
-    } catch (err) {
-      setI2VBadge(stBadge, 'err', '⚠ Failed');
-      if (itemEl) {
-        itemEl.style.borderColor = 'var(--red)';
-        itemEl.insertAdjacentHTML('beforeend', `<div style="font-size:0.72rem;color:var(--red);margin-top:4px">${err.message}</div>`);
-      }
-    }
-    done++;
-  }
-
-  setI2VProg(100, `Done — ${done}/${imgItems.length} processed`);
-  setI2VStatus('done', `${done} video${done !== 1 ? 's' : ''} ready`);
-  btn.disabled = false; btn.textContent = '↺ Re-generate Videos';
-  renderGrid();
-}
-
-async function falJson(res) {
-  const text = await res.text();
-  if (!text.trim()) throw new Error(`Empty response from FAL.ai (HTTP ${res.status})`);
-  try { return JSON.parse(text); }
-  catch(e) { throw new Error(`FAL.ai returned non-JSON (${res.status}): ${text.substring(0, 120)}`); }
-}
-
-function resizeToLTX(dataURL) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Image resize timeout after 15s')), 15000);
-    const img = new Image();
-    img.onload = () => {
-      clearTimeout(timer);
-      try {
-        const W = 768, H = 512;
-        const canvas = document.createElement('canvas');
-        canvas.width = W; canvas.height = H;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, W, H);
-        // Contain (letterbox) — no cropping, original aspect ratio preserved
-        const scale = Math.min(W / img.width, H / img.height);
-        const sw = img.width * scale, sh = img.height * scale;
-        ctx.drawImage(img, (W - sw) / 2, (H - sh) / 2, sw, sh);
-        resolve(canvas.toDataURL('image/jpeg', 0.92));
-      } catch(e) { reject(e); }
-    };
-    img.onerror = () => { clearTimeout(timer); reject(new Error('Image failed to load for resize')); };
-    img.src = dataURL;
-  });
-}
-
-async function callFalWan(imageDataURL, prompt, stBadge) {
-
-  // Resize to 768x512 (LTX requirement)
-  setI2VBadge(stBadge, 'running', 'Resizing...');
-  let resized;
-  try { resized = await resizeToLTX(imageDataURL); }
-  catch(e) { console.warn('Resize failed, using original:', e.message); resized = imageDataURL; }
-
-  // Submit via server proxy — uploads image to FAL.ai storage server-side (no CORS)
-  setI2VBadge(stBadge, 'running', 'Uploading & submitting...');
-  const sub = await fetch('/api/i2v', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fal_key: falKey, image_url: resized, prompt })
-  });
-  const subData = await falJson(sub);
-  if (!sub.ok) throw new Error(`Submit failed (${sub.status}): ` + (subData.detail || subData.error || JSON.stringify(subData)).substring(0, 300));
-
-  // Use the exact URLs returned by FAL.ai — don't construct them manually
-  const statusUrl   = subData.status_url   || `${BASE}/requests/${subData.request_id}/status`;
-  const responseUrl = subData.response_url || `${BASE}/requests/${subData.request_id}`;
-  if (!subData.request_id && !subData.status_url) throw new Error('No request_id or status_url: ' + JSON.stringify(subData).substring(0, 200));
-
-  // Poll — 2s interval, 3 min hard timeout
-  const t0 = Date.now();
-  while (true) {
-    const elapsed = Math.round((Date.now() - t0) / 1000);
-    if (elapsed > 180) throw new Error(`Timeout — no result after ${elapsed}s`);
-    await new Promise(r => setTimeout(r, 2000));
-
-    const sr = await fetch(statusUrl, { headers: { 'Authorization': `Key ${falKey}` } });
-    if (!sr.ok) {
-      const errText = await sr.text().catch(() => '');
-      setI2VBadge(stBadge, 'running', `Poll ${sr.status} · ${elapsed}s`);
-      console.warn('Poll HTTP error', sr.status, errText.substring(0, 100));
-      continue;
-    }
-    const sd = await falJson(sr);
-
-    if (sd.status === 'IN_QUEUE') {
-      const pos = sd.queue_position != null ? ` pos ${sd.queue_position}` : '';
-      setI2VBadge(stBadge, 'running', `Queue${pos} · ${elapsed}s`);
-    } else if (sd.status === 'IN_PROGRESS') {
-      setI2VBadge(stBadge, 'running', `Generating · ${elapsed}s`);
-    } else if (sd.status === 'COMPLETED') {
-      if (sd.error) throw new Error('FAL.ai error: ' + sd.error);
-      const rr = await fetch(responseUrl, { headers: { 'Authorization': `Key ${falKey}` } });
-      const rd = await falJson(rr);
-      const url = rd.video?.url || rd.output?.video?.url;
-      if (!url) throw new Error('No video URL in result: ' + JSON.stringify(rd).substring(0, 200));
-      return url;
-    } else {
-      throw new Error(`Unexpected status "${sd.status}": ` + JSON.stringify(sd).substring(0, 200));
-    }
-  }
-}
-
-function setI2VStatus(type, text) {
-  const el = document.getElementById('i2v-status');
-  el.className = 'status-badge status-' + type;
-  el.innerHTML = `<div class="status-dot${type === 'running' ? ' spin' : ''}"></div> ${text}`;
-}
-
-function setI2VBadge(el, type, text) {
-  el.className = 'status-badge status-' + type;
-  el.innerHTML = `<div class="status-dot${type === 'running' ? ' spin' : ''}"></div>${text}`;
-}
-
-function setI2VProg(pct, label) {
-  document.getElementById('i2v-prog-fill').style.width = pct + '%';
-  document.getElementById('i2v-prog-label').textContent = label;
-}
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
 analyzeText();
 checkAPI();
 loadEnhanceSettings();
-loadFalSettings();
 </script>
 </body>
 </html>
