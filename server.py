@@ -93,7 +93,10 @@ class SecureHandler(SimpleHTTPRequestHandler):
             self._json(200, result)
 
         except Exception as e:
-            self._json(500, {'error': str(e)})
+            import traceback
+            msg = traceback.format_exc()
+            print('[i2v error]', msg, flush=True)
+            self._json(500, {'error': str(e), 'detail': msg[-400:]})
 
     def _json(self, code, data):
         body = json.dumps(data).encode()

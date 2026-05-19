@@ -2201,7 +2201,7 @@ async function callFalWan(imageDataURL, prompt, stBadge) {
     body: JSON.stringify({ fal_key: falKey, image_url: resized, prompt })
   });
   const subData = await falJson(sub);
-  if (!sub.ok) throw new Error(`Submit failed (${sub.status}): ` + (subData.error || JSON.stringify(subData).substring(0, 200)));
+  if (!sub.ok) throw new Error(`Submit failed (${sub.status}): ` + (subData.detail || subData.error || JSON.stringify(subData)).substring(0, 300));
 
   // Use the exact URLs returned by FAL.ai — don't construct them manually
   const statusUrl   = subData.status_url   || `${BASE}/requests/${subData.request_id}/status`;
