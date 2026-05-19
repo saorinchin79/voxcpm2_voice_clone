@@ -2161,18 +2161,23 @@ async function falJson(res) {
 }
 
 function resizeToLTX(dataURL) {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Image resize timeout after 15s')), 15000);
     const img = new Image();
     img.onload = () => {
-      const W = 768, H = 512;
-      const canvas = document.createElement('canvas');
-      canvas.width = W; canvas.height = H;
-      const ctx = canvas.getContext('2d');
-      const scale = Math.max(W / img.width, H / img.height);
-      const sw = img.width * scale, sh = img.height * scale;
-      ctx.drawImage(img, (W - sw) / 2, (H - sh) / 2, sw, sh);
-      resolve(canvas.toDataURL('image/jpeg', 0.92));
+      clearTimeout(timer);
+      try {
+        const W = 768, H = 512;
+        const canvas = document.createElement('canvas');
+        canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        const scale = Math.max(W / img.width, H / img.height);
+        const sw = img.width * scale, sh = img.height * scale;
+        ctx.drawImage(img, (W - sw) / 2, (H - sh) / 2, sw, sh);
+        resolve(canvas.toDataURL('image/jpeg', 0.92));
+      } catch(e) { reject(e); }
     };
+    img.onerror = () => { clearTimeout(timer); reject(new Error('Image failed to load for resize')); };
     img.src = dataURL;
   });
 }
@@ -2180,13 +2185,15 @@ function resizeToLTX(dataURL) {
 async function callFalWan(imageDataURL, prompt, stBadge) {
   const BASE = 'https://queue.fal.run/fal-ai/ltx-video/image-to-video';
 
-  // Resize to 768×512 required by LTX Video
+  // Resize to 768x512 (LTX requirement)
   setI2VBadge(stBadge, 'running', 'Resizing...');
-  const resized = await resizeToLTX(imageDataURL);
+  let resized;
+  try { resized = await resizeToLTX(imageDataURL); }
+  catch(e) { console.warn('Resize failed, using original:', e.message); resized = imageDataURL; }
 
-  // Upload to FAL.ai storage — avoids sending MB-sized base64 in the POST body
+  // Upload to FAL.ai storage
   setI2VBadge(stBadge, 'running', 'Uploading...');
-  let imageUrl = resized;
+  let imageUrl;
   try {
     const imgBlob = await fetch(resized).then(r => r.blob());
     const form = new FormData();
@@ -2197,45 +2204,51 @@ async function callFalWan(imageDataURL, prompt, stBadge) {
       body: form
     });
     const upData = await falJson(upRes);
-    if (upData.url) imageUrl = upData.url;
+    if (!upData.url) throw new Error('No URL in storage response: ' + JSON.stringify(upData));
+    imageUrl = upData.url;
   } catch(e) {
-    console.warn('FAL.ai storage upload failed, falling back to base64:', e.message);
+    throw new Error('Upload failed: ' + e.message);
   }
 
   // Submit inference job
-  setI2VBadge(stBadge, 'running', 'Queueing...');
+  setI2VBadge(stBadge, 'running', 'Submitting...');
   const sub = await fetch(BASE, {
     method: 'POST',
     headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ image_url: imageUrl, prompt, num_inference_steps: 30, guidance_scale: 3, negative_prompt: 'blur, distort, low quality, worst quality' })
   });
   const subData = await falJson(sub);
-  if (!sub.ok) throw new Error(`FAL.ai submit failed (${sub.status}): ${JSON.stringify(subData).substring(0, 120)}`);
-  const { request_id } = subData;
-  if (!request_id) throw new Error('FAL.ai did not return a request_id: ' + JSON.stringify(subData).substring(0, 120));
+  if (!sub.ok) throw new Error(`Submit failed (${sub.status}): ${JSON.stringify(subData).substring(0, 200)}`);
+  const request_id = subData.request_id;
+  if (!request_id) throw new Error('No request_id: ' + JSON.stringify(subData).substring(0, 200));
 
-  // Poll for completion
-  let polls = 0;
-  while (polls++ < 200) {
-    await new Promise(r => setTimeout(r, 3000));
-    setI2VBadge(stBadge, 'running', `⏳ ${Math.round(polls * 3)}s...`);
-    try {
-      const sr = await fetch(`${BASE}/requests/${request_id}/status`, { headers: { 'Authorization': `Key ${falKey}` } });
-      const sd = await falJson(sr);
-      if (sd.status === 'COMPLETED') {
-        const rr = await fetch(`${BASE}/requests/${request_id}`, { headers: { 'Authorization': `Key ${falKey}` } });
-        const rd = await falJson(rr);
-        const url = rd.video?.url || rd.output?.video?.url || rd.outputs?.[0]?.url;
-        if (!url) throw new Error('No video URL in FAL.ai result: ' + JSON.stringify(rd).substring(0, 200));
-        return url;
-      }
-      if (sd.status === 'FAILED') throw new Error('FAL.ai generation failed: ' + (sd.error || JSON.stringify(sd)));
-    } catch(pollErr) {
-      if (pollErr.message.includes('FAL.ai generation failed')) throw pollErr;
-      console.warn('FAL.ai poll error (retrying):', pollErr.message);
+  // Poll — 2s interval, 3 min hard timeout
+  const t0 = Date.now();
+  while (true) {
+    const elapsed = Math.round((Date.now() - t0) / 1000);
+    if (elapsed > 180) throw new Error(`Timeout — no result after ${elapsed}s`);
+    await new Promise(r => setTimeout(r, 2000));
+
+    const sr = await fetch(`${BASE}/requests/${request_id}/status`, { headers: { 'Authorization': `Key ${falKey}` } });
+    if (!sr.ok) { setI2VBadge(stBadge, 'running', `Poll err ${elapsed}s, retrying...`); continue; }
+    const sd = await falJson(sr);
+
+    if (sd.status === 'IN_QUEUE') {
+      const pos = sd.queue_position != null ? ` pos ${sd.queue_position}` : '';
+      setI2VBadge(stBadge, 'running', `Queue${pos} · ${elapsed}s`);
+    } else if (sd.status === 'IN_PROGRESS') {
+      setI2VBadge(stBadge, 'running', `Generating · ${elapsed}s`);
+    } else if (sd.status === 'COMPLETED') {
+      if (sd.error) throw new Error('FAL.ai error: ' + sd.error);
+      const rr = await fetch(`${BASE}/requests/${request_id}`, { headers: { 'Authorization': `Key ${falKey}` } });
+      const rd = await falJson(rr);
+      const url = rd.video?.url || rd.output?.video?.url;
+      if (!url) throw new Error('No video URL in result: ' + JSON.stringify(rd).substring(0, 200));
+      return url;
+    } else {
+      throw new Error(`Unexpected status "${sd.status}": ` + JSON.stringify(sd).substring(0, 200));
     }
   }
-  throw new Error('FAL.ai timeout after 10 minutes');
 }
 
 function setI2VStatus(type, text) {
