@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 import os
 import json
-import base64
 import urllib.request
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
 FAL_MODEL = 'fal-ai/ltx-video/image-to-video'
 FAL_QUEUE = f'https://queue.fal.run/{FAL_MODEL}'
-FAL_STORAGE = 'https://storage.fal.run/'
 
 class SecureHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
@@ -43,38 +41,9 @@ class SecureHandler(SimpleHTTPRequestHandler):
             if not fal_key:   raise ValueError('Missing fal_key')
             if not image_b64: raise ValueError('Missing image_url')
 
-            # Decode base64 data URL
-            if ',' not in image_b64:
-                raise ValueError('image_url must be a base64 data URL')
-            header, b64 = image_b64.split(',', 1)
-            img_bytes = base64.b64decode(b64)
-            mime = header.split(':')[1].split(';')[0]   # e.g. image/jpeg
-
-            # Upload to FAL.ai storage (server-to-server — no CORS)
-            boundary = b'X-BOUNDARY'
-            form = (
-                b'--' + boundary + b'\r\n'
-                b'Content-Disposition: form-data; name="file"; filename="image.jpg"\r\n'
-                b'Content-Type: ' + mime.encode() + b'\r\n\r\n' +
-                img_bytes +
-                b'\r\n--' + boundary + b'--\r\n'
-            )
-            up_req = urllib.request.Request(
-                FAL_STORAGE, data=form,
-                headers={
-                    'Authorization': f'Key {fal_key}',
-                    'Content-Type': f'multipart/form-data; boundary={boundary.decode()}'
-                }
-            )
-            with urllib.request.urlopen(up_req, timeout=30) as r:
-                up = json.loads(r.read())
-            image_url = up.get('url')
-            if not image_url:
-                raise ValueError('FAL.ai storage returned no URL: ' + str(up)[:200])
-
-            # Submit inference job with the hosted URL
+            # Submit inference job — send base64 data URL directly (server-to-server, no CORS)
             payload = json.dumps({
-                'image_url': image_url,
+                'image_url': image_b64,
                 'prompt': prompt,
                 'num_inference_steps': 30,
                 'guidance_scale': 3,
