@@ -756,9 +756,7 @@
 </div>
 
 <script>
-const API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-  ? 'http://localhost:8808'
-  : '';
+const API = '';
 let mediaItems = [], videoBlob = null, selectedFX = 'tectonic', finalBlob = null, generatedVideoURL = null, combinedAudioBlob = null;
 let frameOverlayImg = null; // PNG frame overlay image element
 let generatedSegments = []; // [{text, url, blob}]
