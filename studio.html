@@ -322,7 +322,7 @@
           </div>
           <div>
             <label class="input-label">Motion Prompt <span style="color:var(--text3)">(optional)</span></label>
-            <input type="text" id="i2v-prompt" value="Smooth cinematic motion" style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:7px 10px;font-size:0.78rem;font-family:var(--font)">
+            <input type="text" id="i2v-prompt" value="camera tilt horizontal" style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:7px 10px;font-size:0.78rem;font-family:var(--font)">
           </div>
         </div>
         <button class="btn btn-primary btn-full" id="i2v-btn" onclick="batchImageToVideo()" disabled>
@@ -2101,7 +2101,7 @@ async function batchImageToVideo() {
   document.getElementById('i2v-progress').style.display = 'block';
   setI2VStatus('running', `Converting ${imgItems.length} image${imgItems.length > 1 ? 's' : ''}...`);
 
-  const prompt = (document.getElementById('i2v-prompt').value || '').trim() || 'Smooth cinematic motion, high quality';
+  const prompt = (document.getElementById('i2v-prompt').value || '').trim() || 'camera tilt horizontal';
   const itemsDiv = document.getElementById('i2v-items');
   itemsDiv.innerHTML = imgItems.map(({item, idx}) =>
     `<div class="i2v-item" id="i2v-item-${idx}">
@@ -2171,7 +2171,10 @@ function resizeToLTX(dataURL) {
         const canvas = document.createElement('canvas');
         canvas.width = W; canvas.height = H;
         const ctx = canvas.getContext('2d');
-        const scale = Math.max(W / img.width, H / img.height);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, W, H);
+        // Contain (letterbox) — no cropping, original aspect ratio preserved
+        const scale = Math.min(W / img.width, H / img.height);
         const sw = img.width * scale, sh = img.height * scale;
         ctx.drawImage(img, (W - sw) / 2, (H - sh) / 2, sw, sh);
         resolve(canvas.toDataURL('image/jpeg', 0.92));
