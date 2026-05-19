@@ -2191,24 +2191,8 @@ async function callFalWan(imageDataURL, prompt, stBadge) {
   try { resized = await resizeToLTX(imageDataURL); }
   catch(e) { console.warn('Resize failed, using original:', e.message); resized = imageDataURL; }
 
-  // Upload to FAL.ai storage
-  setI2VBadge(stBadge, 'running', 'Uploading...');
-  let imageUrl;
-  try {
-    const imgBlob = await fetch(resized).then(r => r.blob());
-    const form = new FormData();
-    form.append('file', imgBlob, 'image.jpg');
-    const upRes = await fetch('https://storage.fal.run/', {
-      method: 'POST',
-      headers: { 'Authorization': `Key ${falKey}` },
-      body: form
-    });
-    const upData = await falJson(upRes);
-    if (!upData.url) throw new Error('No URL in storage response: ' + JSON.stringify(upData));
-    imageUrl = upData.url;
-  } catch(e) {
-    throw new Error('Upload failed: ' + e.message);
-  }
+  // Use resized base64 directly — FAL.ai inference accepts data URLs
+  const imageUrl = resized;
 
   // Submit inference job
   setI2VBadge(stBadge, 'running', 'Submitting...');
