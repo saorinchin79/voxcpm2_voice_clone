@@ -1175,8 +1175,10 @@ async function generateVideo() {
 
   setProgress(15, 'Starting encoder...');
   const stream = canvas.captureStream(FPS);
-  const videoMime = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'].find(t => MediaRecorder.isTypeSupported(t)) || '';
-  const rec = new MediaRecorder(stream, {mimeType: videoMime, videoBitsPerSecond:8000000});
+  const videoMime = typeof MediaRecorder.isTypeSupported === 'function'
+    ? ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'].find(t => MediaRecorder.isTypeSupported(t))
+    : undefined;
+  const rec = new MediaRecorder(stream, Object.assign({videoBitsPerSecond:8000000}, videoMime ? {mimeType: videoMime} : {}));
   const chunks = [];
   rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
@@ -1824,8 +1826,10 @@ async function combineAndDownload() {
 
     const videoStream = canvas.captureStream(FPS);
     const combined    = new MediaStream([...videoStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
-    const avMime = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'].find(t => MediaRecorder.isTypeSupported(t)) || '';
-    const rec         = new MediaRecorder(combined, {mimeType: avMime, videoBitsPerSecond:6000000});
+    const avMime = typeof MediaRecorder.isTypeSupported === 'function'
+      ? ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'].find(t => MediaRecorder.isTypeSupported(t))
+      : undefined;
+    const rec         = new MediaRecorder(combined, Object.assign({videoBitsPerSecond:6000000}, avMime ? {mimeType: avMime} : {}));
     const chunks      = [];
     rec.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
 
