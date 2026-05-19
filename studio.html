@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VoxCPM2 Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Suwannaphum:wght@100;300;400;700;900&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0a0a0f;
@@ -23,8 +23,8 @@
     --text: #f1f0ff;
     --text2: #9e9bb8;
     --text3: #5c5875;
-    --font: 'Syne', sans-serif;
-    --mono: 'DM Mono', monospace;
+    --font: 'Suwannaphum', sans-serif;
+    --mono: 'Suwannaphum', sans-serif;
     --radius: 12px;
     --radius2: 20px;
   }
@@ -70,6 +70,11 @@
   .img-thumb { position: relative; aspect-ratio: 16/9; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
   .img-thumb img { width: 100%; height: 100%; object-fit: cover; }
   .img-thumb .remove-btn { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; background: rgba(239,68,68,0.9); border: none; color: white; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+  .media-badge { position: absolute; bottom: 4px; left: 4px; font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: white; }
+  .badge-video { background: rgba(245,158,11,0.9); }
+  .badge-image { background: rgba(124,110,247,0.9); }
+  .badge-enhancing { background: rgba(16,185,129,0.9); animation: pulse 1s infinite; }
+  .img-thumb video { width: 100%; height: 100%; object-fit: cover; }
   .img-count { font-size: 0.75rem; color: var(--text2); margin-top: 0.5rem; font-family: var(--mono); }
 
   /* SETTINGS */
@@ -186,6 +191,14 @@
   .fx-name { font-size: 0.75rem; font-weight: 700; margin-top: 6px; }
   .fx-sub { font-size: 0.65rem; color: var(--text3); margin-top: 2px; }
   .fx-demo { height: 40px; border-radius: 6px; background: var(--bg4); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+
+  /* DRAG REORDER */
+  .img-thumb[draggable=true] { cursor: grab; user-select: none; }
+  .img-thumb[draggable=true]:active { cursor: grabbing; }
+  .img-thumb.drag-target { border: 2px solid var(--accent) !important; transform: scale(1.05); box-shadow: 0 0 16px rgba(124,110,247,0.4); transition: transform 0.15s; }
+
+  /* I2V CARD */
+  .i2v-item { padding: 10px 12px; background: var(--bg3); border-radius: var(--radius); border: 1px solid var(--border); transition: border-color 0.3s; }
 </style>
 </head>
 <body>
@@ -220,10 +233,10 @@
         </div>
 
         <div class="upload-zone" id="upload-zone">
-          <input type="file" id="file-input" accept="image/*" multiple>
-          <div class="upload-icon">🖼</div>
-          <div class="upload-title">Drop images here</div>
-          <div class="upload-sub">or click to browse · PNG, JPG, WEBP supported</div>
+          <input type="file" id="file-input" accept="image/*,video/*" multiple>
+          <div class="upload-icon">🖼 🎬</div>
+          <div class="upload-title">Drop images or videos here</div>
+          <div class="upload-sub">Images: PNG JPG WEBP · Videos: MP4 MOV WEBM · Images auto-enhanced ✨</div>
         </div>
 
         <div class="image-grid" id="image-grid"></div>
@@ -275,10 +288,94 @@
           </div>
           <div class="setting-row">
             <div><div class="setting-label">Output resolution</div><div class="setting-sub">Video dimensions</div></div>
-            <select id="resolution">
-              <option value="1920x1080">1920 × 1080 (Full HD)</option>
-              <option value="1280x720">1280 × 720 (HD)</option>
+            <select id="resolution" onchange="updateFrameHint()">
+              <option value="1920x1080">📺 1920 × 1080 — Landscape 16:9 (YouTube / TV)</option>
+              <option value="1080x1920">📱 1080 × 1920 — Vertical 9:16 (TikTok / Reels / Shorts)</option>
+              <option value="1080x1080">⬜ 1080 × 1080 — Square 1:1 (Instagram Grid)</option>
+              <option value="1080x1350">📲 1080 × 1350 — Portrait 4:5 (Facebook / LinkedIn Feed)</option>
             </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI IMAGE TO VIDEO (FAL.ai WAN 2.1) -->
+      <div class="card fade-in" id="i2v-card" style="animation-delay:0.15s;border:1px solid rgba(124,110,247,0.25)">
+        <div class="section-header">
+          <div>
+            <div class="card-title" style="color:var(--accent2)">✦ AI Image to Video <span style="color:var(--text3);font-weight:400">· FAL.ai WAN 2.1 · Free Tier</span></div>
+            <div class="section-title" style="font-size:0.95rem">Convert Each Image → 5s Video</div>
+          </div>
+          <div class="status-badge status-idle" id="i2v-status"><div class="status-dot"></div>Idle</div>
+        </div>
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:0.9rem;margin-bottom:1rem">
+          <div style="font-size:0.78rem;font-weight:700;color:var(--accent2);margin-bottom:5px">How it works</div>
+          <div style="font-size:0.75rem;color:var(--text2);line-height:1.7">Each uploaded image is sent to <strong style="color:var(--text)">WAN 2.1</strong> (hosted on FAL.ai) which generates a <strong style="color:var(--text)">5-second cinematic video clip</strong> per image. Free credits included on signup — no billing required to start.</div>
+          <div style="margin-top:6px;font-size:0.73rem;color:var(--text3)">Get a free key: fal.ai → Sign up → Dashboard → API Keys</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div>
+            <label class="input-label">FAL.ai API Key</label>
+            <div style="position:relative">
+              <input type="password" id="fal-key" placeholder="xxxxxx:yyyyyy..." style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:7px 32px 7px 10px;font-size:0.78rem;font-family:var(--mono)">
+              <span onclick="toggleFalKeyVis()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:0.82rem" id="fal-key-eye">👁</span>
+            </div>
+          </div>
+          <div>
+            <label class="input-label">Motion Prompt <span style="color:var(--text3)">(optional)</span></label>
+            <input type="text" id="i2v-prompt" value="Smooth cinematic motion" style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:7px 10px;font-size:0.78rem;font-family:var(--font)">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" id="i2v-btn" onclick="batchImageToVideo()" disabled>
+          🎬 Generate 5s Videos from Images
+        </button>
+        <div id="i2v-progress" style="display:none;margin-top:1rem">
+          <div class="progress-wrap">
+            <div class="progress-bar-bg"><div class="progress-bar-fill" id="i2v-prog-fill" style="width:0%"></div></div>
+            <div class="progress-label" id="i2v-prog-label">Initializing...</div>
+          </div>
+          <div id="i2v-items" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+      </div>
+
+      <!-- STEP 3 — PNG FRAME OVERLAY -->
+      <div class="card fade-in" style="animation-delay:0.2s">
+        <div class="section-header">
+          <div>
+            <div class="card-title">Step 3 — PNG Frame Overlay <span style="color:var(--text3);font-weight:400">(optional)</span></div>
+            <div class="section-title" style="font-size:0.95rem">Decorative Frame / Border</div>
+          </div>
+          <div class="status-badge status-idle" id="frame-status"><div class="status-dot"></div>No frame</div>
+        </div>
+
+        <div style="background:var(--bg3);border:1px dashed var(--border2);border-radius:var(--radius);padding:1rem;margin-bottom:1rem">
+          <div style="font-size:0.78rem;color:var(--accent2);font-weight:700;margin-bottom:6px">💡 Frame Size Hint</div>
+          <div style="font-size:0.75rem;color:var(--text2);line-height:1.9" id="frame-hint">
+            Select your output resolution first, then create a PNG frame that matches exactly:<br>
+            📺 <strong style="color:var(--text)">Landscape 16:9</strong> → <span style="font-family:var(--mono);color:var(--accent3)">1920 × 1080 px</span><br>
+            📱 <strong style="color:var(--text)">Vertical 9:16</strong> → <span style="font-family:var(--mono);color:var(--accent3)">1080 × 1920 px</span><br>
+            ⬜ <strong style="color:var(--text)">Square 1:1</strong> → <span style="font-family:var(--mono);color:var(--accent3)">1080 × 1080 px</span><br>
+            📲 <strong style="color:var(--text)">Portrait 4:5</strong> → <span style="font-family:var(--mono);color:var(--accent3)">1080 × 1350 px</span><br>
+            <span style="color:var(--text3)">Frame must be PNG with transparent interior so your video shows through.</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:1rem;align-items:flex-start;flex-wrap:wrap">
+          <div style="flex:1;min-width:180px">
+            <label class="file-upload-btn" for="frame-input" style="justify-content:center">
+              🖼 Upload PNG Frame
+            </label>
+            <input type="file" id="frame-input" accept="image/png" onchange="loadFrameOverlay(this)">
+            <div class="help" style="margin-top:6px">PNG only · transparent background required</div>
+          </div>
+
+          <div id="frame-preview-wrap" style="display:none;flex:1;min-width:180px">
+            <div style="position:relative;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background: repeating-conic-gradient(#1a1a24 0% 25%, #111118 0% 50%) 0 0 / 12px 12px">
+              <img id="frame-preview-img" style="width:100%;display:block;max-height:120px;object-fit:contain">
+            </div>
+            <div style="display:flex;gap:6px;margin-top:8px;align-items:center">
+              <span style="font-size:0.72rem;color:var(--text3);font-family:var(--mono)" id="frame-info"></span>
+              <button class="btn btn-outline" style="font-size:0.72rem;padding:4px 10px;margin-left:auto" onclick="removeFrame()">✕ Remove</button>
+            </div>
           </div>
         </div>
       </div>
@@ -306,19 +403,61 @@
         </div>
       </div>
 
-      <div class="card fade-in" style="animation-delay:0.2s">
-        <div class="card-title">Quick Guide</div>
-        <div style="font-size:0.8rem;color:var(--text2);line-height:1.8">
-          <div>① Upload 2+ images</div>
-          <div>② Choose transition style</div>
-          <div>③ Click Generate</div>
-          <div>④ Review & add voice</div>
+      <div class="card fade-in" style="animation-delay:0.2s;border:1px solid rgba(124,110,247,0.3)">
+        <div class="card-title" style="color:var(--accent2)">✨ AI Enhancement API</div>
+        <div style="font-size:0.75rem;color:var(--text2);margin-bottom:10px;line-height:1.6">
+          <strong style="color:var(--text)">Real-ESRGAN</strong> — Fast · 4x upscale · face fix<br>
+          <strong style="color:var(--text)">Topaz Image AI</strong> — Best quality · 6x · 5 models<br>
+          <span style="color:var(--text3)">No key = canvas fallback (basic)</span>
         </div>
-        <div class="divider"></div>
-        <div style="font-size:0.75rem;color:var(--text3)">Output: WebM/MP4 · 1920×1080 · H.264</div>
+        <div class="input-wrap" style="margin-bottom:8px">
+          <label class="input-label">Replicate API Key</label>
+          <div style="position:relative">
+            <input type="password" id="replicate-key" placeholder="r8_xxxx..." style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:8px 36px 8px 10px;font-size:0.8rem;font-family:var(--mono)">
+            <span onclick="toggleKeyVis()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:0.85rem;user-select:none" id="key-eye">👁</span>
+          </div>
+          <div class="help" style="margin-top:4px">Get free key at <a href="https://replicate.com" target="_blank" style="color:var(--accent2)">replicate.com</a></div>
+        </div>
+        <div class="input-wrap" style="margin-bottom:8px">
+          <label class="input-label">Model</label>
+          <select id="enhance-model" style="width:100%;font-size:0.78rem">
+            <option value="nightmareai/real-esrgan">Real-ESRGAN (Fast · recommended)</option>
+            <option value="topazlabs/image-upscale">Topaz Image AI (Best quality)</option>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div>
+            <label class="input-label">Scale</label>
+            <select id="enhance-scale" style="width:100%;font-size:0.78rem">
+              <option value="2">2× upscale</option>
+              <option value="4" selected>4× upscale</option>
+            </select>
+          </div>
+          <div>
+            <label class="input-label">Face Enhance</label>
+            <div class="toggle-wrap" style="margin-top:6px">
+              <div class="toggle on" id="face-enhance-toggle" onclick="this.classList.toggle('on')"></div>
+              <span style="font-size:0.75rem;color:var(--text2)">GFPGAN</span>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" style="font-size:0.78rem;padding:8px" onclick="saveEnhanceSettings()">💾 Save & Apply Settings</button>
+        <div style="font-size:0.7rem;color:var(--text3);margin-top:6px;text-align:center" id="enhance-settings-status">Not saved</div>
       </div>
 
       <div class="card fade-in" style="animation-delay:0.25s">
+        <div class="card-title">Quick Guide</div>
+        <div style="font-size:0.8rem;color:var(--text2);line-height:1.8">
+          <div>① Upload images or videos</div>
+          <div>② Images auto-enhanced via AI ✨</div>
+          <div>③ Add PNG frame (optional)</div>
+          <div>④ Generate video → add voice</div>
+        </div>
+        <div class="divider"></div>
+        <div style="font-size:0.75rem;color:var(--text3)">Output: WebM/MP4 · Multi-resolution · H.264</div>
+      </div>
+
+      <div class="card fade-in" style="animation-delay:0.3s">
         <div class="card-title">Transition Info</div>
         <div style="font-size:0.8rem;color:var(--text2);line-height:1.8">
           <div><span style="color:var(--accent2)">Tectonic</span> — Diagonal plate wipe</div>
@@ -362,7 +501,7 @@
           <div style="font-size:0.7rem;color:var(--text3);margin-top:4px">Duration</div>
         </div>
         <div style="background:var(--bg3);border-radius:var(--radius);padding:1rem;text-align:center">
-          <div style="font-size:1.5rem;font-weight:800;color:var(--accent2)">1080p</div>
+          <div style="font-size:1.5rem;font-weight:800;color:var(--accent2)" id="stat-res">—</div>
           <div style="font-size:0.7rem;color:var(--text3);margin-top:4px">Resolution</div>
         </div>
         <div style="background:var(--bg3);border-radius:var(--radius);padding:1rem;text-align:center">
@@ -387,7 +526,15 @@
 
         <div class="input-wrap">
           <label class="input-label">✍ Target Text — content to speak</label>
-          <textarea id="target-text" rows="4" placeholder="Enter the text you want VoxCPM2 to speak...">VoxCPM2 is a creative multilingual TTS model, designed to generate highly realistic speech in 30 languages.</textarea>
+          <textarea id="target-text" rows="4" placeholder="Enter the text you want VoxCPM2 to speak..." oninput="analyzeText()">VoxCPM2 is a creative multilingual TTS model, designed to generate highly realistic speech in 30 languages.</textarea>
+          <div id="text-analysis" style="margin-top:8px;padding:10px 14px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <span style="font-size:0.75rem;color:var(--text3)">~<span id="est-seconds">3</span>s estimated</span>
+            <span style="color:var(--border2)">|</span>
+            <span style="font-size:0.75rem;color:var(--text3)"><span id="char-count">103</span> chars</span>
+            <span style="color:var(--border2)">|</span>
+            <span style="font-size:0.75rem;font-weight:700" id="segment-badge">1 segment · fits in 1 clip</span>
+          </div>
+          <div id="segment-preview" style="display:none;margin-top:8px"></div>
         </div>
 
         <div class="input-wrap">
@@ -488,17 +635,61 @@
         </div>
       </div>
 
+      <!-- SEGMENTS OUTPUT -->
       <div class="card fade-in" style="animation-delay:0.1s">
         <div class="section-header">
-          <div class="card-title">Generated Audio Output</div>
+          <div>
+            <div class="card-title">Generated Audio Segments</div>
+            <div class="section-title" style="font-size:0.95rem" id="segments-title">Audio Output</div>
+          </div>
           <div class="status-badge status-idle" id="output-status"><div class="status-dot"></div>Waiting</div>
         </div>
-        <div class="output-area" id="audio-output-area">
-          <div class="output-empty">Generated audio will appear here</div>
+        <div id="audio-output-area">
+          <div class="output-area"><div class="output-empty">Generated audio segments will appear here</div></div>
         </div>
-        <div id="audio-actions" style="display:none;margin-top:1rem;display:flex;gap:1rem;align-items:center">
-          <button class="btn btn-green" onclick="downloadAudio()">⬇ Download Audio</button>
+        <div id="audio-actions" style="display:none;margin-top:1rem;gap:1rem;align-items:center">
+          <button class="btn btn-outline" onclick="downloadAllAudio()">⬇ Download All MP3s</button>
           <span style="font-size:0.75rem;color:var(--text3);font-family:var(--mono)" id="audio-meta"></span>
+        </div>
+      </div>
+
+      <!-- FINAL COMBINE STEP -->
+      <div class="card fade-in" id="combine-card" style="animation-delay:0.15s;display:none;border:1px solid var(--gold);background:rgba(245,158,11,0.05)">
+        <div class="section-header">
+          <div>
+            <div class="card-title" style="color:var(--gold)">Final Step — Combine & Export</div>
+            <div class="section-title">MP4 + Audio → Final Video</div>
+          </div>
+          <div class="status-badge" id="combine-status" style="background:rgba(245,158,11,0.15);color:var(--gold)"><div class="status-dot" style="background:var(--gold)"></div>Ready to combine</div>
+        </div>
+        <div style="font-size:0.82rem;color:var(--text2);margin-bottom:1rem;line-height:1.7">
+          All <span id="combine-count" style="color:var(--accent2);font-weight:700">0</span> audio segments are generated and will be concatenated, then merged with your video.
+          The final video duration matches the total audio length.
+        </div>
+        <div id="combine-progress" style="display:none;margin-bottom:1rem">
+          <div class="progress-wrap">
+            <div class="progress-bar-bg"><div class="progress-bar-fill" id="cprog-fill" style="width:0%"></div></div>
+            <div class="progress-label" id="cprog-label">Preparing...</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-gold btn-lg" onclick="combineAndDownload()" id="combine-btn">
+            🎬 Combine & Download Final Video
+          </button>
+          <div style="font-size:0.75rem;color:var(--text3)">Output: WebM with audio track · All segments concatenated</div>
+        </div>
+        <div id="final-output" style="display:none;margin-top:1.5rem">
+          <div class="card-title" style="margin-bottom:0.75rem">Final Video Preview</div>
+          <video id="final-video" controls style="width:100%;border-radius:var(--radius);border:1px solid var(--gold)"></video>
+          <div style="margin-top:1rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-gold btn-lg" onclick="downloadFinal(this)" id="mp4-dl-btn">⬇ Download Final MP4</button>
+            <button class="btn btn-green btn-lg" onclick="downloadFinalMP3(this)" id="mp3-dl-btn">🎵 Download Final MP3</button>
+            <span style="font-size:0.75rem;color:var(--text3)" id="final-meta"></span>
+          </div>
+          <div style="margin-top:8px">
+            <span style="font-size:0.72rem;color:var(--text3)">MP4 conversion uses FFmpeg.wasm in-browser · </span>
+            <a href="#" onclick="downloadWebM();return false;" style="font-size:0.72rem;color:var(--text3);text-decoration:underline">Download as WebM instead</a>
+          </div>
         </div>
       </div>
     </div>
@@ -564,468 +755,1456 @@
 
 <script>
 const API = 'http://localhost:8808';
-let images = [], videoBlob = null, selectedFX = 'tectonic', audioBlob = null, generatedVideoURL = null;
+let mediaItems = [], videoBlob = null, selectedFX = 'tectonic', finalBlob = null, generatedVideoURL = null, combinedAudioBlob = null;
+let frameOverlayImg = null; // PNG frame overlay image element
+let generatedSegments = []; // [{text, url, blob}]
 
+// ─── PAGE NAVIGATION ────────────────────────────────────────────────────────
 function showPage(name) {
-  document.querySelectorAll('.page,.page-single').forEach(p=>p.classList.remove('active'));
-  const map = {create:'page-create',review:'page-review',voice:'page-voice'};
+  document.querySelectorAll('.page,.page-single').forEach(p => p.classList.remove('active'));
+  const map = {create:'page-create', review:'page-review', voice:'page-voice'};
   document.getElementById(map[name]).classList.add('active');
-  document.querySelectorAll('.nav-tab').forEach((t,i)=>{
-    const tabs=['create','review','voice'];
-    t.classList.toggle('active', tabs[i]===name || (i===1 && name==='review'));
+  document.querySelectorAll('.nav-tab').forEach((t,i) => {
+    const tabs = ['create','review','voice'];
+    t.classList.toggle('active', tabs[i] === name);
   });
-  if(name==='voice' && generatedVideoURL) showSidebarVideo();
+  if (name === 'voice' && generatedVideoURL) showSidebarVideo();
 }
 
 function selectFX(el) {
-  document.querySelectorAll('.fx-card').forEach(c=>c.classList.remove('selected'));
+  document.querySelectorAll('.fx-card').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
   selectedFX = el.dataset.fx;
   document.getElementById('fx-mode').value = selectedFX;
 }
 
-// IMAGE UPLOAD
+// ─── MEDIA UPLOAD (IMAGE + VIDEO) ────────────────────────────────────────────
 const zone = document.getElementById('upload-zone');
-const fi = document.getElementById('file-input');
-zone.addEventListener('dragover', e=>{e.preventDefault();zone.classList.add('drag-over')});
-zone.addEventListener('dragleave', ()=>zone.classList.remove('drag-over'));
-zone.addEventListener('drop', e=>{e.preventDefault();zone.classList.remove('drag-over');handleFiles(e.dataTransfer.files)});
-fi.addEventListener('change', e=>handleFiles(e.target.files));
+const fi   = document.getElementById('file-input');
+zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', ()  => zone.classList.remove('drag-over'));
+zone.addEventListener('drop',      e  => { e.preventDefault(); zone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
+fi.addEventListener('change', e => handleFiles(e.target.files));
 
 function handleFiles(files) {
-  Array.from(files).forEach(f=>{
-    if(!f.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      images.push({src:ev.target.result, name:f.name});
+  Array.from(files).forEach(f => {
+    if (f.type.startsWith('image/')) {
+      const idx = mediaItems.length;
+      mediaItems.push({type:'image', src:'', name:f.name, blob:f, enhanced:false, duration:0});
       renderGrid();
-    };
-    reader.readAsDataURL(f);
+      // Load raw first, then enhance
+      const reader = new FileReader();
+      reader.onload = ev => {
+        mediaItems[idx].src = ev.target.result;
+        renderGrid();
+        enhanceImage(ev.target.result, idx);
+      };
+      reader.readAsDataURL(f);
+    } else if (f.type.startsWith('video/')) {
+      const idx = mediaItems.length;
+      const blobURL = URL.createObjectURL(f);
+      mediaItems.push({type:'video', src:blobURL, name:f.name, blob:f, enhanced:false, duration:0});
+      renderGrid();
+      // Get video duration + first-frame thumbnail
+      const tmpVid = document.createElement('video');
+      tmpVid.src = blobURL;
+      tmpVid.muted = true;
+      tmpVid.onloadedmetadata = () => {
+        mediaItems[idx].duration = tmpVid.duration;
+        renderGrid();
+      };
+      tmpVid.load();
+    }
   });
 }
 
-function renderGrid() {
-  const grid = document.getElementById('image-grid');
-  grid.innerHTML = images.map((img,i)=>`
-    <div class="img-thumb">
-      <img src="${img.src}" alt="${img.name}">
-      <button class="remove-btn" onclick="removeImg(${i})">×</button>
-    </div>
-  `).join('');
-  const count = images.length;
-  document.getElementById('img-count-badge').textContent = count + ' image' + (count!==1?'s':'');
-  document.getElementById('img-count-badge').className = 'status-badge ' + (count>0?'status-running':'status-idle');
-  document.getElementById('img-count-text').textContent = count > 0 ? `${count} image${count!==1?'s':''} ready · ${(count*5)}s estimated duration` : '';
-  document.getElementById('generate-btn').disabled = count < 1;
+// ─── ENHANCEMENT API SETTINGS ────────────────────────────────────────────────
+let replicateKey  = sessionStorage.getItem('rep_key')  || '';
+let enhanceModel  = sessionStorage.getItem('rep_model') || 'nightmareai/real-esrgan';
+let enhanceScale  = parseInt(sessionStorage.getItem('rep_scale') || '4');
+let faceEnhance   = sessionStorage.getItem('rep_face') !== 'false';
+
+function loadEnhanceSettings() {
+  if (replicateKey) {
+    document.getElementById('replicate-key').value = replicateKey;
+    document.getElementById('enhance-settings-status').textContent = 'API key loaded ✓';
+    document.getElementById('enhance-settings-status').style.color = 'var(--green)';
+  }
+  document.getElementById('enhance-model').value = enhanceModel;
+  document.getElementById('enhance-scale').value = String(enhanceScale);
+  if (faceEnhance) document.getElementById('face-enhance-toggle').classList.add('on');
 }
 
-function removeImg(i) { images.splice(i,1); renderGrid(); }
+function saveEnhanceSettings() {
+  replicateKey  = document.getElementById('replicate-key').value.trim();
+  enhanceModel  = document.getElementById('enhance-model').value;
+  enhanceScale  = parseInt(document.getElementById('enhance-scale').value);
+  faceEnhance   = document.getElementById('face-enhance-toggle').classList.contains('on');
+  sessionStorage.setItem('rep_key',   replicateKey);
+  sessionStorage.setItem('rep_model', enhanceModel);
+  sessionStorage.setItem('rep_scale', String(enhanceScale));
+  sessionStorage.setItem('rep_face',  String(faceEnhance));
+  const st = document.getElementById('enhance-settings-status');
+  st.textContent = replicateKey ? '✅ Saved — AI enhance active' : '⚠ No key — using canvas fallback';
+  st.style.color = replicateKey ? 'var(--green)' : 'var(--gold)';
+}
 
-// VIDEO GENERATION
+function toggleKeyVis() {
+  const inp = document.getElementById('replicate-key');
+  const eye = document.getElementById('key-eye');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  eye.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+
+// ─── IMAGE ENHANCEMENT (Replicate AI API + Canvas fallback) ───────────────────
+async function enhanceImage(dataURL, idx) {
+  if (!mediaItems[idx]) return;
+  const badge = document.getElementById(`badge-${idx}`);
+  const setBadge = (txt, cls) => { if(badge){ badge.textContent=txt; badge.className='media-badge '+cls; } };
+  setBadge('✨ Enhancing...', 'badge-enhancing');
+
+  if (replicateKey) {
+    try {
+      await enhanceImageAPI(dataURL, idx, setBadge);
+      return;
+    } catch(apiErr) {
+      console.warn('[Enhance] API failed, falling back to canvas:', apiErr.message);
+      setBadge('⚡ Canvas fallback...', 'badge-enhancing');
+    }
+  }
+  // Canvas-based fallback (no API key or API failed)
+  await enhanceImageCanvas(dataURL, idx, setBadge);
+}
+
+async function enhanceImageAPI(dataURL, idx, setBadge) {
+  const [owner, model] = enhanceModel.split('/');
+  setBadge('🚀 Sending to AI...', 'badge-enhancing');
+
+  // Build input per model
+  let input = {};
+  if (enhanceModel === 'nightmareai/real-esrgan') {
+    input = { image: dataURL, scale: enhanceScale, face_enhance: faceEnhance };
+  } else if (enhanceModel === 'topazlabs/image-upscale') {
+    input = { image: dataURL, scale: enhanceScale, model: 'standard' };
+  } else {
+    input = { image: dataURL, scale: enhanceScale };
+  }
+
+  // Submit prediction via Replicate API
+  const res = await fetch(`https://api.replicate.com/v1/models/${enhanceModel}/predictions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${replicateKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'wait' // ask for synchronous response if fast enough
+    },
+    body: JSON.stringify({ input })
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Replicate ${res.status}: ${errBody.substring(0,120)}`);
+  }
+
+  let prediction = await res.json();
+  setBadge('⏳ AI processing...', 'badge-enhancing');
+
+  // Poll until done
+  let polls = 0;
+  while (prediction.status !== 'succeeded' && prediction.status !== 'failed') {
+    if (polls++ > 120) throw new Error('Timeout waiting for enhancement');
+    await new Promise(r => setTimeout(r, 2000));
+    const poll = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+      headers: { 'Authorization': `Bearer ${replicateKey}` }
+    });
+    prediction = await poll.json();
+    setBadge(`⏳ AI (${Math.round(polls*2)}s)...`, 'badge-enhancing');
+  }
+
+  if (prediction.status === 'failed') throw new Error('Replicate failed: ' + prediction.error);
+
+  // Get output URL (Real-ESRGAN returns string, Topaz returns object)
+  const outputURL = typeof prediction.output === 'string'
+    ? prediction.output
+    : (prediction.output?.url || prediction.output?.[0]);
+
+  if (!outputURL) throw new Error('No output URL in prediction');
+
+  // Fetch result and convert to data URL
+  setBadge('📥 Downloading...', 'badge-enhancing');
+  const imgRes = await fetch(outputURL);
+  if (!imgRes.ok) throw new Error('Failed to download enhanced image');
+  const blob  = await imgRes.blob();
+  const enhanced = await new Promise(r => {
+    const reader = new FileReader(); reader.onload = e => r(e.target.result); reader.readAsDataURL(blob);
+  });
+
+  if (mediaItems[idx]) { mediaItems[idx].src = enhanced; mediaItems[idx].enhanced = true; }
+  setBadge('✨ AI Enhanced', 'badge-image');
+  renderGrid();
+}
+
+// Canvas-based fallback: sharpen + contrast + saturation
+async function enhanceImageCanvas(dataURL, idx, setBadge) {
+  const img = new Image();
+  await new Promise(r => { img.onload = r; img.src = dataURL; });
+  const maxW = 1920;
+  const scale = img.width > maxW ? maxW / img.width : 1;
+  const W = Math.round(img.width * scale), H = Math.round(img.height * scale);
+  const canvas = document.createElement('canvas'); canvas.width=W; canvas.height=H;
+  const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, W, H);
+
+  // Step 1: Gaussian smooth (3x3) — removes noise, softens harshness
+  const gk = [1,2,1,2,4,2,1,2,1], gd = 16;
+  const src = ctx.getImageData(0,0,W,H); const dst = new ImageData(W,H);
+  const s=src.data, d=dst.data;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++) {
+    let r=0,g=0,b=0;
+    for(let ky=0;ky<3;ky++) for(let kx=0;kx<3;kx++){
+      const px=Math.min(W-1,Math.max(0,x+kx-1)),py=Math.min(H-1,Math.max(0,y+ky-1)),si=(py*W+px)*4,kv=gk[ky*3+kx];
+      r+=s[si]*kv; g+=s[si+1]*kv; b+=s[si+2]*kv;
+    }
+    const di=(y*W+x)*4;
+    d[di]=r/gd; d[di+1]=g/gd; d[di+2]=b/gd; d[di+3]=s[di+3];
+  }
+  ctx.putImageData(dst,0,0);
+
+  // Step 2: Mild unsharp mask — blend original + blurred for gentle clarity
+  //   result = original + 0.25 * (original - blurred)  →  very soft sharpening
+  const blurred = ctx.getImageData(0,0,W,H);
+  const orig    = src.data, blur = blurred.data;
+  const out     = new ImageData(W,H); const o = out.data;
+  for(let i=0;i<orig.length;i+=4){
+    const amt = 0.25;
+    o[i]   = Math.min(255,Math.max(0, orig[i]   + amt*(orig[i]   - blur[i])));
+    o[i+1] = Math.min(255,Math.max(0, orig[i+1] + amt*(orig[i+1] - blur[i+1])));
+    o[i+2] = Math.min(255,Math.max(0, orig[i+2] + amt*(orig[i+2] - blur[i+2])));
+    o[i+3] = orig[i+3];
+  }
+  ctx.putImageData(out,0,0);
+
+  // Step 3: Gentle contrast + saturation (softer values)
+  const id2=ctx.getImageData(0,0,W,H); const px=id2.data;
+  for(let i=0;i<px.length;i+=4){
+    // Contrast +6% (was +12%)
+    px[i]  =Math.min(255,Math.max(0,(px[i]  -128)*1.06+128));
+    px[i+1]=Math.min(255,Math.max(0,(px[i+1]-128)*1.06+128));
+    px[i+2]=Math.min(255,Math.max(0,(px[i+2]-128)*1.06+128));
+    // Saturation +8% (was +18%)
+    const avg=(px[i]+px[i+1]+px[i+2])/3;
+    px[i]  =Math.min(255,Math.max(0,avg+(px[i]  -avg)*1.08));
+    px[i+1]=Math.min(255,Math.max(0,avg+(px[i+1]-avg)*1.08));
+    px[i+2]=Math.min(255,Math.max(0,avg+(px[i+2]-avg)*1.08));
+  }
+  ctx.putImageData(id2,0,0);
+
+  const enhanced = canvas.toDataURL('image/jpeg',0.95);
+  if(mediaItems[idx]){ mediaItems[idx].src=enhanced; mediaItems[idx].enhanced=true; }
+  setBadge('⚡ Enhanced', 'badge-image');
+  renderGrid();
+}
+
+function renderGrid() {
+  const grid  = document.getElementById('image-grid');
+  const imgCount = mediaItems.filter(m=>m.type==='image').length;
+  const vidCount = mediaItems.filter(m=>m.type==='video').length;
+
+  const drag = (i) => `id="thumb-${i}" draggable="true" ondragstart="dragStart(event,${i})" ondragover="dragOver(event,${i})" ondragleave="dragLeave(event,${i})" ondrop="dragDrop(event,${i})" ondragend="dragEnd(event)"`;
+  grid.innerHTML = mediaItems.map((item, i) => {
+    if (item.type === 'image') {
+      const badgeText  = item.enhanced ? '✨ Enhanced' : (item.src ? '⏳ Enhancing...' : '⏳ Loading...');
+      const badgeClass = item.enhanced ? 'badge-image' : 'badge-enhancing';
+      return `<div class="img-thumb" ${drag(i)}>
+        <img src="${item.src || ''}" alt="${item.name}" style="opacity:${item.src?1:0.4};pointer-events:none">
+        <button class="remove-btn" onclick="removeMedia(${i})">×</button>
+        <span class="media-badge ${badgeClass}" id="badge-${i}">${badgeText}</span>
+      </div>`;
+    } else {
+      const dur = item.duration > 0 ? item.duration.toFixed(1)+'s' : '...';
+      return `<div class="img-thumb" ${drag(i)}>
+        <video src="${item.src}" muted preload="metadata" style="pointer-events:none"></video>
+        <button class="remove-btn" onclick="removeMedia(${i})">×</button>
+        <span class="media-badge badge-video" id="badge-${i}">▶ ${dur}</span>
+      </div>`;
+    }
+  }).join('');
+
+  const total = mediaItems.length;
+  const label = [imgCount>0?`${imgCount} image${imgCount!==1?'s':''}`:'', vidCount>0?`${vidCount} video${vidCount!==1?'s':''}`:''].filter(Boolean).join(' + ');
+  document.getElementById('img-count-badge').textContent = total > 0 ? label : '0 files';
+  document.getElementById('img-count-badge').className = 'status-badge ' + (total > 0 ? 'status-running' : 'status-idle');
+
+  // Estimate duration
+  const imgDur = parseInt(document.getElementById('img-duration').value) || 5;
+  const estSec = mediaItems.reduce((a,m) => a + (m.type==='image' ? imgDur : (m.duration||0)), 0);
+  document.getElementById('img-count-text').textContent = total > 0
+    ? `${total} file${total!==1?'s':''} ready · ~${Math.round(estSec)}s estimated · images auto-enhanced ✨`
+    : '';
+  document.getElementById('generate-btn').disabled = total < 1;
+  const i2vBtn = document.getElementById('i2v-btn');
+  if (i2vBtn) i2vBtn.disabled = mediaItems.filter(m => m.type === 'image').length < 1;
+}
+
+function removeMedia(i) { mediaItems.splice(i,1); renderGrid(); }
+
+// ─── DRAG-TO-REORDER ─────────────────────────────────────────────────────────
+let dragSrcIdx = null;
+
+function dragStart(e, idx) {
+  dragSrcIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => { const el = document.getElementById(`thumb-${idx}`); if (el) el.style.opacity = '0.4'; }, 0);
+}
+
+function dragOver(e, idx) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.img-thumb.drag-target').forEach(el => el.classList.remove('drag-target'));
+  const el = document.getElementById(`thumb-${idx}`);
+  if (el && idx !== dragSrcIdx) el.classList.add('drag-target');
+}
+
+function dragLeave(e, idx) {
+  const el = document.getElementById(`thumb-${idx}`);
+  if (el) el.classList.remove('drag-target');
+}
+
+function dragDrop(e, idx) {
+  e.stopPropagation();
+  if (dragSrcIdx === null || dragSrcIdx === idx) { dragSrcIdx = null; return; }
+  document.querySelectorAll('.img-thumb.drag-target').forEach(el => el.classList.remove('drag-target'));
+  const [item] = mediaItems.splice(dragSrcIdx, 1);
+  mediaItems.splice(idx, 0, item);
+  dragSrcIdx = null;
+  renderGrid();
+}
+
+function dragEnd() {
+  dragSrcIdx = null;
+  document.querySelectorAll('.img-thumb').forEach(el => { el.style.opacity = '1'; el.classList.remove('drag-target'); });
+}
+
+// ─── PNG FRAME OVERLAY ────────────────────────────────────────────────────────
+function loadFrameOverlay(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.type !== 'image/png') { alert('Please upload a PNG file only.'); input.value=''; return; }
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      frameOverlayImg = img;
+      document.getElementById('frame-preview-img').src = ev.target.result;
+      document.getElementById('frame-preview-wrap').style.display = 'block';
+      document.getElementById('frame-info').textContent = `${img.naturalWidth} × ${img.naturalHeight} px`;
+
+      // Check if frame matches selected resolution
+      const resSel = document.getElementById('resolution').value.split('x');
+      const W = parseInt(resSel[0]), H = parseInt(resSel[1]);
+      const st = document.getElementById('frame-status');
+      if (img.naturalWidth === W && img.naturalHeight === H) {
+        st.className = 'status-badge status-done';
+        st.innerHTML = '<div class="status-dot"></div>✓ Size matches!';
+      } else {
+        st.className = 'status-badge status-err';
+        st.innerHTML = `<div class="status-dot"></div>⚠ Size mismatch (need ${W}×${H})`;
+      }
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function updateFrameHint() {
+  if (!frameOverlayImg) return;
+  const resSel = document.getElementById('resolution').value.split('x');
+  const W = parseInt(resSel[0]), H = parseInt(resSel[1]);
+  const st = document.getElementById('frame-status');
+  if (frameOverlayImg.naturalWidth === W && frameOverlayImg.naturalHeight === H) {
+    st.className = 'status-badge status-done';
+    st.innerHTML = '<div class="status-dot"></div>✓ Size matches!';
+  } else {
+    st.className = 'status-badge status-err';
+    st.innerHTML = `<div class="status-dot"></div>⚠ Need ${W}×${H}`;
+  }
+}
+
+function removeFrame() {
+  frameOverlayImg = null;
+  document.getElementById('frame-input').value = '';
+  document.getElementById('frame-preview-wrap').style.display = 'none';
+  document.getElementById('frame-status').className = 'status-badge status-idle';
+  document.getElementById('frame-status').innerHTML = '<div class="status-dot"></div>No frame';
+}
+
+// ─── VIDEO GENERATION (IMAGES + VIDEOS COMBINED) ─────────────────────────────
 async function generateVideo() {
-  if(images.length < 1) return;
+  if (mediaItems.length < 1) return;
   const btn = document.getElementById('generate-btn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Generating...';
-  document.getElementById('gen-progress').style.display='block';
-  setGlobalStatus('running','Generating video...');
+  btn.disabled = true; btn.textContent = '⏳ Generating...';
+  document.getElementById('gen-progress').style.display = 'block';
+  setGlobalStatus('running', 'Generating video...');
 
-  const dur = parseInt(document.getElementById('img-duration').value);
-  const fxMode = document.getElementById('fx-mode').value;
+  const imgDur    = parseInt(document.getElementById('img-duration').value);
+  const fxMode    = document.getElementById('fx-mode').value;
+  const resSel    = document.getElementById('resolution').value.split('x');
+  const W = parseInt(resSel[0]), H = parseInt(resSel[1]);
   const FPS = 30;
-  const W = 1920, H = 1080;
-  const transFrames = Math.floor(FPS * 0.8);
-  const holdFrames = Math.floor(FPS * (dur - 0.8));
+  const transFrames = Math.floor(FPS * 0.6);
 
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
 
-  // Load all images
-  setProgress(5, 'Loading images...');
-  const loaded = await Promise.all(images.map(img => new Promise(res=>{
-    const i = new Image();
-    i.onload=()=>res(i);
-    i.src=img.src;
+  setProgress(5, 'Loading media...');
+
+  // Load all images as Image elements (use enhanced src)
+  // Videos: create video elements from blobs
+  const loaded = await Promise.all(mediaItems.map(item => new Promise(res => {
+    if (item.type === 'image') {
+      const img = new Image(); img.onload = () => res(img); img.src = item.src;
+    } else {
+      const vid = document.createElement('video');
+      vid.src = item.src; vid.muted = true; vid.preload = 'auto';
+      vid.onloadeddata = () => res(vid);
+      vid.onerror = () => res(vid); // fallback
+      vid.load();
+    }
   })));
 
   setProgress(15, 'Starting encoder...');
   const stream = canvas.captureStream(FPS);
-  const rec = new MediaRecorder(stream, {mimeType:'video/webm;codecs=vp9', videoBitsPerSecond:8000000});
+  const videoMime = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+  const rec = new MediaRecorder(stream, {mimeType: videoMime, videoBitsPerSecond:8000000});
   const chunks = [];
-  rec.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
+  rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
   const fxTypes = ['tectonic','drift','pop'];
-  function getFX(idx) {
-    if(fxMode==='random') return fxTypes[Math.floor(Math.random()*3)];
-    return fxMode;
+  const getFX   = () => fxMode==='random' ? fxTypes[Math.floor(Math.random()*3)] : fxMode;
+
+  function drawCover(el) {
+    const w = el.videoWidth  || el.naturalWidth  || el.width  || W;
+    const h = el.videoHeight || el.naturalHeight || el.height || H;
+    const r = Math.min(W/w, H/h);
+    ctx.fillStyle = '#000'; ctx.fillRect(0,0,W,H);
+    ctx.drawImage(el, (W-w*r)/2, (H-h*r)/2, w*r, h*r);
+    // Draw PNG frame overlay on top if loaded
+    if (frameOverlayImg) ctx.drawImage(frameOverlayImg, 0, 0, W, H);
   }
 
-  function drawCover(img, ctx, W, H) {
-    const r = Math.min(W/img.width, H/img.height);
-    const iW = img.width*r, iH = img.height*r;
-    ctx.drawImage(img, (W-iW)/2, (H-iH)/2, iW, iH);
-  }
-
-  function drawFrame(imgA, imgB, progress, fx, ctx, W, H) {
-    ctx.clearRect(0,0,W,H);
+  function drawTransition(elA, elB, p, fx) {
     const ease = t => t<0.5 ? 2*t*t : -1+(4-2*t)*t;
-    const p = ease(Math.min(1, Math.max(0, progress)));
-
-    if(fx==='tectonic') {
-      // Tectonic: diagonal plate wipe
-      ctx.save();
-      ctx.beginPath();
-      const x = W*p;
-      ctx.rect(0,0,x,H);
-      ctx.clip();
+    const ep = ease(Math.min(1, Math.max(0, p)));
+    if (fx === 'tectonic') {
+      const x = W*ep;
+      ctx.save(); ctx.beginPath(); ctx.rect(0,0,x,H); ctx.clip(); drawCover(elB); ctx.restore();
+      ctx.save(); ctx.beginPath(); ctx.rect(x,0,W-x,H); ctx.clip(); drawCover(elA); ctx.restore();
+      ctx.save(); ctx.strokeStyle=`rgba(124,110,247,${0.8*(1-ep)})`; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.moveTo(x-10,0); ctx.lineTo(x+10,H); ctx.stroke(); ctx.restore();
+    } else if (fx === 'drift') {
       ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
-      drawCover(imgB,ctx,W,H);
-      ctx.restore();
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(x,0,W-x,H);
-      ctx.clip();
+      ctx.save(); ctx.translate(-W*ep,0); drawCover(elA); ctx.restore();
+      ctx.save(); ctx.translate(W*(1-ep),0); drawCover(elB); ctx.restore();
+    } else { // pop / fade
       ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
-      drawCover(imgA,ctx,W,H);
-      // Tectonic line
-      ctx.restore();
-      ctx.save();
-      ctx.strokeStyle = `rgba(124,110,247,${0.8*(1-p)})`;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(x-10,0); ctx.lineTo(x+10,H);
-      ctx.stroke();
-      ctx.restore();
-    } else if(fx==='drift') {
-      // Drift: pan slide
-      ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
-      const offsetA = -W*p;
-      ctx.save();
-      ctx.translate(offsetA,0);
-      drawCover(imgA,ctx,W,H);
-      ctx.restore();
-      ctx.save();
-      ctx.translate(W-W*p,0);
-      drawCover(imgB,ctx,W,H);
-      ctx.restore();
-    } else if(fx==='pop') {
-      // Pop: scale zoom
-      ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
-      const scaleB = 0.5 + 0.5*p;
-      const alphaA = 1-p;
-      ctx.save();
-      ctx.globalAlpha = alphaA;
-      drawCover(imgA,ctx,W,H);
-      ctx.restore();
-      ctx.save();
-      ctx.globalAlpha = p;
-      ctx.translate(W/2,H/2);
-      ctx.scale(scaleB,scaleB);
-      ctx.translate(-W/2,-H/2);
-      drawCover(imgB,ctx,W,H);
-      ctx.restore();
+      ctx.save(); ctx.globalAlpha=1-ep; drawCover(elA); ctx.restore();
+      ctx.save(); ctx.globalAlpha=ep;
+      ctx.translate(W/2,H/2); ctx.scale(0.5+0.5*ep,0.5+0.5*ep); ctx.translate(-W/2,-H/2);
+      drawCover(elB); ctx.restore();
     }
+    // Frame overlay on top of transition too
+    if (frameOverlayImg) ctx.drawImage(frameOverlayImg, 0, 0, W, H);
   }
 
-  rec.start(100);
-  setProgress(20, 'Rendering frames...');
-
-  const totalFrames = images.length * (holdFrames + transFrames) + holdFrames;
+  // Estimate total render time for progress
+  const totalSec = mediaItems.reduce((a,m) => a + (m.type==='image' ? imgDur : (m.duration||5)), 0);
+  const totalFrames = Math.round(totalSec * FPS) + mediaItems.length * transFrames;
   let frameCount = 0;
 
-  async function renderNextFrame(imgIdx, frameInSlide) {
-    if(imgIdx >= images.length) {
-      // Final hold on last image
-      for(let f=0;f<holdFrames;f++) {
-        ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
-        drawCover(loaded[images.length-1],ctx,W,H);
-        await new Promise(r=>setTimeout(r,1000/FPS));
+  rec.start(100); setProgress(20, 'Rendering frames...');
+
+  // ── Render each media item sequentially ──
+  for (let i = 0; i < mediaItems.length; i++) {
+    const item = mediaItems[i];
+    const el   = loaded[i];
+    const next = i+1 < loaded.length ? loaded[i+1] : null;
+    const label = `Item ${i+1}/${mediaItems.length}`;
+
+    if (item.type === 'image') {
+      // Hold frames
+      const holdFrames = Math.floor(FPS * imgDur);
+      for (let f=0; f<holdFrames; f++) {
+        drawCover(el); frameCount++;
+        setProgress(Math.min(94, 20+74*(frameCount/totalFrames)), `Rendering image ${label}...`);
+        await new Promise(r => setTimeout(r, 1000/FPS));
       }
-      return;
+    } else {
+      // Play video at natural speed on canvas
+      el.currentTime = 0;
+      el.play().catch(()=>{});
+      const vidDur  = (item.duration || el.duration || 5) * 1000;
+      const t0 = performance.now();
+      await new Promise(resolve => {
+        function vframe() {
+          const elapsed = performance.now() - t0;
+          drawCover(el); frameCount++;
+          setProgress(Math.min(94, 20+74*(frameCount/totalFrames)), `Playing video ${label} · ${(elapsed/1000).toFixed(1)}s...`);
+          if (elapsed < vidDur && !el.ended) {
+            setTimeout(vframe, 1000/FPS);
+          } else { el.pause(); resolve(); }
+        }
+        setTimeout(vframe, 1000/FPS);
+      });
     }
 
-    if(frameInSlide < holdFrames) {
-      ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
-      drawCover(loaded[imgIdx],ctx,W,H);
-      frameCount++;
-      const pct = 20 + 75*(frameCount/totalFrames);
-      setProgress(Math.min(95,pct), `Rendering slide ${imgIdx+1}/${images.length}...`);
-      await new Promise(r=>setTimeout(r,1000/FPS));
-      return renderNextFrame(imgIdx, frameInSlide+1);
-    } else {
-      const transFrame = frameInSlide - holdFrames;
-      if(transFrame < transFrames && imgIdx+1 < images.length) {
-        const p = transFrame/transFrames;
-        const fx = getFX(imgIdx);
-        drawFrame(loaded[imgIdx], loaded[imgIdx+1], p, fx, ctx, W, H);
-        frameCount++;
-        await new Promise(r=>setTimeout(r,1000/FPS));
-        return renderNextFrame(imgIdx, frameInSlide+1);
-      } else {
-        return renderNextFrame(imgIdx+1, 0);
+    // Transition to next item (skip on last)
+    if (next) {
+      // Seek next video to beginning if needed
+      if (mediaItems[i+1] && mediaItems[i+1].type === 'video') {
+        next.currentTime = 0;
+        await new Promise(r => { next.onseeked = r; setTimeout(r, 300); });
+      }
+      for (let f=0; f<transFrames; f++) {
+        drawTransition(el, next, f/transFrames, getFX());
+        frameCount++; await new Promise(r => setTimeout(r, 1000/FPS));
       }
     }
   }
 
-  await renderNextFrame(0,0);
-  setProgress(97, 'Finalizing...');
-  rec.stop();
-
-  await new Promise(r=>rec.onstop=r);
+  setProgress(97, 'Finalizing...'); rec.stop();
+  await new Promise(r => rec.onstop = r);
   videoBlob = new Blob(chunks, {type:'video/webm'});
   generatedVideoURL = URL.createObjectURL(videoBlob);
 
-  // Show preview
-  const previewArea = document.getElementById('preview-area');
-  previewArea.innerHTML = `<video src="${generatedVideoURL}" controls style="width:100%;border-radius:8px"></video>`;
-
-  // Setup review
+  document.getElementById('preview-area').innerHTML = `<video src="${generatedVideoURL}" controls style="width:100%;border-radius:8px"></video>`;
   document.getElementById('review-video').src = generatedVideoURL;
-  document.getElementById('stat-images').textContent = images.length;
-  document.getElementById('stat-duration').textContent = (images.length * dur) + 's';
+  const imgCount = mediaItems.filter(m=>m.type==='image').length;
+  const vidCount = mediaItems.filter(m=>m.type==='video').length;
+  document.getElementById('stat-images').textContent = `${imgCount}img ${vidCount>0?'+'+vidCount+'vid':''}`;
+  document.getElementById('stat-duration').textContent = Math.round(totalSec)+'s';
   document.getElementById('stat-fx').textContent = document.getElementById('fx-mode').options[document.getElementById('fx-mode').selectedIndex].text.split(' ')[0];
-
-  document.getElementById('tab-review').style.display='';
-  setProgress(100, 'Done!');
-  setGlobalStatus('done','Video ready');
-
-  setTimeout(()=>{
-    showPage('review');
-    btn.disabled=false;
-    btn.textContent='⬡ Generate MP4 Video';
+  const resLabels = {'1920x1080':'16:9 HD','1080x1920':'9:16 Vertical','1080x1080':'1:1 Square','1080x1350':'4:5 Portrait'};
+  document.getElementById('stat-res').textContent = resLabels[document.getElementById('resolution').value] || (W+'×'+H);
+  document.getElementById('tab-review').style.display = '';
+  setProgress(100,'Done!'); setGlobalStatus('done','Video ready');
+  setTimeout(() => {
+    showPage('review'); btn.disabled=false; btn.textContent='⬡ Generate MP4 Video';
     document.getElementById('gen-progress').style.display='none';
   }, 600);
 }
 
-function setProgress(pct, label) {
-  document.getElementById('prog-fill').style.width = pct+'%';
-  document.getElementById('prog-label').textContent = label;
+function setProgress(pct,label) { document.getElementById('prog-fill').style.width=pct+'%'; document.getElementById('prog-label').textContent=label; }
+function setGlobalStatus(type,text) { const el=document.getElementById('global-status'); el.className='status-badge status-'+type; el.innerHTML=`<div class="status-dot${type==='running'?' spin':''}"></div> ${text}`; }
+function downloadVideo() { if(!videoBlob)return; const a=document.createElement('a'); a.href=generatedVideoURL; a.download='voxcpm2_video.webm'; a.click(); }
+function goToVoice() { showPage('voice'); if(generatedVideoURL)showSidebarVideo(); }
+function showSidebarVideo() { document.getElementById('sidebar-video-empty').style.display='none'; document.getElementById('sidebar-video-player').style.display='block'; document.getElementById('sidebar-video').src=generatedVideoURL; }
+
+// ─── TEXT SPLITTING ──────────────────────────────────────────────────────────
+// ~14 chars/sec is average TTS speed; 29s limit = 406 chars max per segment
+const CHARS_PER_SEC = 14;
+const MAX_CHARS     = 29 * CHARS_PER_SEC; // 406
+
+function splitTextToSegments(rawText) {
+  if (!rawText.trim()) return [];
+
+  // Step 1: split into paragraphs first (blank lines)
+  const paragraphs = rawText.split(/\n[^\S\n]*\n/).map(p => p.trim()).filter(p => p.length > 0);
+
+  const segments = [];
+
+  for (const para of paragraphs) {
+    if (para.length <= MAX_CHARS) {
+      // Whole paragraph fits → push as-is, merging with previous if both are small
+      if (segments.length > 0 && (segments[segments.length-1] + ' ' + para).length <= MAX_CHARS) {
+        segments[segments.length-1] += ' ' + para;
+      } else {
+        segments.push(para);
+      }
+      continue;
+    }
+
+    // Step 2: paragraph too long → split by sentences
+    // Handles: . ! ? ។ (Khmer) । (Hindi) and newlines
+    const sentenceRe = /[^.!?\u17D4\u0964\r\n]+[.!?\u17D4\u0964]?[ \t]*/g;
+    const sentences  = para.match(sentenceRe) || [para];
+    let current = '';
+
+    for (const sent of sentences) {
+      const trimmed = sent.trim();
+      if (!trimmed) continue;
+      const candidate = current ? current + ' ' + trimmed : trimmed;
+
+      if (candidate.length > MAX_CHARS && current.length > 0) {
+        // Current chunk is full — push it and start fresh
+        segments.push(current.trim());
+        current = trimmed;
+      } else {
+        current = candidate;
+      }
+    }
+    if (current.trim()) segments.push(current.trim());
+  }
+
+  // Step 3: safety pass — split any still-oversized chunk at word boundaries
+  const result = [];
+  for (const seg of segments) {
+    if (seg.length <= MAX_CHARS) { result.push(seg); continue; }
+    const words = seg.split(/[ \t\n\r]+/);
+    let chunk = '';
+    for (const w of words) {
+      const candidate = chunk ? chunk + ' ' + w : w;
+      if (candidate.length > MAX_CHARS && chunk) { result.push(chunk); chunk = w; }
+      else { chunk = candidate; }
+    }
+    if (chunk) result.push(chunk);
+  }
+
+  return result.filter(s => s.trim().length > 0);
 }
 
-function setGlobalStatus(type, text) {
-  const el = document.getElementById('global-status');
-  const dot = el.querySelector('.status-dot');
-  el.className = 'status-badge status-'+type;
-  dot.className = 'status-dot' + (type==='running'?' spin':'');
-  el.innerHTML = `<div class="status-dot${type==='running'?' spin':''}"></div> ${text}`;
+function analyzeText() {
+  const text  = document.getElementById('target-text').value;
+  const chars = text.length;
+  const estSec = Math.round(chars / CHARS_PER_SEC);
+  const segs  = splitTextToSegments(text);
+  const n     = segs.length;
+
+  document.getElementById('char-count').textContent  = chars;
+  document.getElementById('est-seconds').textContent = estSec;
+
+  const badge   = document.getElementById('segment-badge');
+  const preview = document.getElementById('segment-preview');
+
+  if (n <= 1) {
+    badge.textContent = '1 segment · fits in 1 clip';
+    badge.style.color = 'var(--green)';
+    preview.style.display = 'none';
+  } else {
+    badge.textContent = `${n} segments · auto-split at paragraph/sentence boundaries`;
+    badge.style.color = 'var(--gold)';
+    preview.style.display = 'block';
+    preview.innerHTML = segs.map((s,i) => `
+      <div style="padding:8px 12px;background:var(--bg4);border-radius:8px;margin-bottom:6px;border-left:3px solid var(--accent)">
+        <div style="font-size:0.72rem;color:var(--text3);margin-bottom:3px;font-weight:700">
+          Clip ${i+1} · ~${Math.round(s.length/CHARS_PER_SEC)}s · ${s.length} chars
+        </div>
+        <div style="font-size:0.78rem;color:var(--text2);line-height:1.5">${s.substring(0,130)}${s.length>130?'…':''}</div>
+      </div>`).join('');
+  }
 }
 
-function downloadVideo() {
-  if(!videoBlob) return;
-  const a = document.createElement('a'); a.href=generatedVideoURL; a.download='voxcpm2_video.webm'; a.click();
-}
-
-function goToVoice() {
-  showPage('voice');
-  if(generatedVideoURL) showSidebarVideo();
-}
-
-function showSidebarVideo() {
-  document.getElementById('sidebar-video-empty').style.display='none';
-  document.getElementById('sidebar-video-player').style.display='block';
-  document.getElementById('sidebar-video').src = generatedVideoURL;
-}
-
-// VOICE GENERATION
+// ─── VOICE CONTROLS ──────────────────────────────────────────────────────────
 function toggleUltimate() {
-  const t = document.getElementById('ultimate-toggle');
+  const t  = document.getElementById('ultimate-toggle');
   t.classList.toggle('on');
   const on = t.classList.contains('on');
   document.getElementById('prompt-text-wrap').style.display = on ? 'block' : 'none';
   document.getElementById('control-instruction').disabled = on;
-  if(on) document.getElementById('control-instruction').style.opacity='0.3';
-  else document.getElementById('control-instruction').style.opacity='1';
+  document.getElementById('control-instruction').style.opacity = on ? '0.3' : '1';
 }
 
 function applyPreset(el, text) {
-  document.querySelectorAll('#preset-tags .tag').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#preset-tags .tag').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('control-instruction').value = text;
 }
 
 function loadRefAudio(input) {
-  const file = input.files[0];
-  if(!file) return;
-  const url = URL.createObjectURL(file);
+  const file = input.files[0]; if (!file) return;
+  const url  = URL.createObjectURL(file);
   document.getElementById('ref-audio-player').src = url;
-  document.getElementById('ref-audio-preview').style.display='block';
+  document.getElementById('ref-audio-preview').style.display = 'block';
   document.getElementById('ref-audio-name').textContent = file.name + ' · ' + (file.size/1024).toFixed(0) + 'KB';
   input._file = file;
 }
 
 async function checkAPI() {
   const el = document.getElementById('api-status');
-  el.className='status-badge status-running';
-  el.innerHTML='<div class="status-dot spin"></div> Checking...';
+  el.className = 'status-badge status-running';
+  el.innerHTML = '<div class="status-dot spin"></div> Checking...';
   try {
-    const r = await fetch(API+'/gradio_api/info', {signal:AbortSignal.timeout(5000)});
-    if(r.ok) {
-      el.className='status-badge status-done';
-      el.innerHTML='<div class="status-dot"></div> Connected';
-    } else throw new Error();
-  } catch(e) {
-    el.className='status-badge status-err';
-    el.innerHTML='<div class="status-dot"></div> Offline';
-  }
+    const r = await fetch(API+'/gradio_api/info', {signal: AbortSignal.timeout(5000)});
+    if (r.ok) { el.className='status-badge status-done'; el.innerHTML='<div class="status-dot"></div> Connected'; }
+    else throw new Error();
+  } catch(e) { el.className='status-badge status-err'; el.innerHTML='<div class="status-dot"></div> Offline'; }
 }
 
-async function generateVoice() {
-  const text = document.getElementById('target-text').value.trim();
-  if(!text) return alert('Please enter target text');
+// ─── SINGLE VoxCPM2 API CALL ─────────────────────────────────────────────────
+async function callVoxCPM2(segText, ctrl, refWav, usePrompt, promptText, cfgVal, doNorm, denoise, ditSteps) {
+  const payload = {
+    text: segText,
+    control_instruction: ctrl,
+    ref_wav: refWav,
+    use_prompt_text: usePrompt,
+    prompt_text_value: promptText,
+    cfg_value: cfgVal,
+    do_normalize: doNorm,
+    denoise: denoise,
+    dit_steps: ditSteps
+  };
 
-  const btn = document.getElementById('voice-btn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Generating...';
-  document.getElementById('voice-progress').style.display='block';
-  setVoiceStatus('running','Generating...');
-  setVProg(10,'Connecting to VoxCPM2...');
+  // Step 1: submit job
+  const initRes = await fetch(API + '/gradio_api/call/v2/generate', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+  if (!initRes.ok) throw new Error('API submit failed (' + initRes.status + '): ' + await initRes.text());
 
-  const ctrl = document.getElementById('control-instruction').value;
-  const usePrompt = document.getElementById('ultimate-toggle').classList.contains('on');
-  const promptText = document.getElementById('prompt-text').value;
-  const cfgVal = parseFloat(document.getElementById('cfg-val').value);
-  const ditSteps = parseInt(document.getElementById('dit-steps').value);
-  const doNorm = document.getElementById('normalize-toggle').classList.contains('on');
-  const denoise = document.getElementById('denoise-toggle').classList.contains('on');
-  const refInput = document.getElementById('ref-audio-input');
-  const refFile = refInput._file || null;
+  const initJson = await initRes.json();
+  const event_id = initJson.event_id;
+  if (!event_id) throw new Error('No event_id returned from API');
 
-  try {
-    setVProg(20,'Uploading audio...');
-    let refWav = null;
-    if(refFile) {
-      const fd = new FormData();
-      fd.append('files', refFile);
-      const uploadRes = await fetch(API+'/gradio_api/upload', {method:'POST', body:fd});
-      if(uploadRes.ok) {
-        const paths = await uploadRes.json();
-        refWav = {path:paths[0], meta:{_type:'gradio.FileData'}, orig_name:refFile.name};
+  // Step 2: stream SSE result
+  const evtRes = await fetch(API + '/gradio_api/call/generate/' + event_id);
+  if (!evtRes.ok) throw new Error('SSE stream failed: ' + evtRes.status);
+
+  const reader = evtRes.body.getReader();
+  const dec    = new TextDecoder();
+  let buf = '', result = null, lastEvent = '';
+
+  while (true) {
+    const {done, value} = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, {stream: true});
+
+    // Process complete SSE lines
+    const lines = buf.split('\n');
+    buf = lines.pop(); // keep incomplete last line
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      if (trimmed.startsWith('event:')) {
+        lastEvent = trimmed.slice(6).trim();
+        continue;
       }
-    }
 
-    setVProg(40,'Sending to model...');
-    const payload = {
-      text, control_instruction: ctrl,
-      ref_wav: refWav,
-      use_prompt_text: usePrompt,
-      prompt_text_value: promptText,
-      cfg_value: cfgVal,
-      do_normalize: doNorm,
-      denoise: denoise,
-      dit_steps: ditSteps
-    };
+      if (trimmed.startsWith('data:')) {
+        const dataStr = trimmed.slice(5).trim();
+        if (dataStr === 'null' || dataStr === '') continue;
 
-    const initRes = await fetch(API+'/gradio_api/call/v2/generate', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
-    });
-
-    if(!initRes.ok) throw new Error('API call failed: '+initRes.status);
-    const {event_id} = await initRes.json();
-
-    setVProg(60,'Model is generating speech...');
-
-    // Poll SSE
-    const evtRes = await fetch(API+'/gradio_api/call/generate/'+event_id);
-    const reader = evtRes.body.getReader();
-    const dec = new TextDecoder();
-    let result = null;
-    let buf = '';
-
-    while(true) {
-      const {done, value} = await reader.read();
-      if(done) break;
-      buf += dec.decode(value, {stream:true});
-      const lines = buf.split('\n');
-      buf = lines.pop();
-      for(const line of lines) {
-        if(line.startsWith('data:')) {
+        // Only parse on 'complete' event (Gradio final output)
+        if (lastEvent === 'complete') {
           try {
-            const data = JSON.parse(line.slice(5));
-            if(Array.isArray(data) && data[0]?.url) {
+            const data = JSON.parse(dataStr);
+            // data is an array of outputs; first element is the audio FileData
+            if (Array.isArray(data) && data.length > 0) {
+              const audioData = data[0];
+              if (audioData && (audioData.url || audioData.path)) {
+                result = audioData;
+              }
+            }
+          } catch(e) {
+            console.warn('SSE parse error:', e, dataStr.substring(0,100));
+          }
+        }
+
+        // Also try parsing any data line as fallback (some Gradio versions differ)
+        if (!result) {
+          try {
+            const data = JSON.parse(dataStr);
+            if (Array.isArray(data) && data.length > 0 && data[0] && (data[0].url || data[0].path)) {
               result = data[0];
             }
-          } catch(e){}
+          } catch(e) {}
         }
       }
     }
-
-    setVProg(90,'Processing output...');
-
-    if(result) {
-      const audioURL = result.url || (API + '/gradio_api/file=' + result.path);
-      const outArea = document.getElementById('audio-output-area');
-      outArea.innerHTML = `
-        <div style="width:100%">
-          <audio controls style="width:100%;border-radius:8px" id="gen-audio">
-            <source src="${audioURL}">
-          </audio>
-          <div style="font-size:0.75rem;color:var(--text3);margin-top:8px;font-family:var(--mono)">
-            Generated · ${new Date().toLocaleTimeString()} · CFG ${cfgVal} · ${ditSteps} steps
-          </div>
-        </div>`;
-      document.getElementById('audio-actions').style.display='flex';
-      document.getElementById('output-status').className='status-badge status-done';
-      document.getElementById('output-status').innerHTML='<div class="status-dot"></div>Ready';
-      const r = await fetch(audioURL);
-      audioBlob = await r.blob();
-    } else {
-      throw new Error('No audio in response');
-    }
-
-    setVProg(100,'Done!');
-    setVoiceStatus('done','Speech ready');
-  } catch(e) {
-    setVoiceStatus('err','Error: '+e.message);
-    setVProg(0,'Failed: '+e.message);
-    document.getElementById('audio-output-area').innerHTML=`<div class="output-empty" style="color:var(--red)">⚠ ${e.message}<br><span style="font-size:0.75rem;color:var(--text3)">Make sure VoxCPM2 is running on port 8808</span></div>`;
   }
 
-  btn.disabled=false;
-  btn.textContent='🔊 Generate Speech';
-  setTimeout(()=>document.getElementById('voice-progress').style.display='none',2000);
+  if (!result) throw new Error('No audio result received from VoxCPM2. Check the model is running and the text is valid.');
+
+  // Build final URL
+  // Normalize URL - replace 0.0.0.0 / 127.0.0.1 with localhost
+  let audioURL = result.url
+    ? result.url
+    : (API + '/gradio_api/file=' + encodeURIComponent(result.path));
+  audioURL = audioURL
+    .replace('http://0.0.0.0:', 'http://localhost:')
+    .replace('http://127.0.0.1:', 'http://localhost:');
+  console.log('[VoxCPM2] Audio URL:', audioURL);
+
+  return audioURL;
+}
+
+// ─── MULTI-SEGMENT VOICE GENERATION ─────────────────────────────────────────
+async function generateVoice() {
+  const rawText = document.getElementById('target-text').value.trim();
+  if (!rawText) return alert('Please enter target text');
+
+  // Split text into ≤29s segments
+  const segments = splitTextToSegments(rawText);
+  if (segments.length === 0) return alert('No text to generate');
+
+  const n = segments.length;
+  generatedSegments = [];
+  finalBlob = null;
+
+  const btn = document.getElementById('voice-btn');
+  btn.disabled = true;
+  btn.textContent = n > 1 ? `⏳ Generating ${n} clips...` : '⏳ Generating...';
+  document.getElementById('voice-progress').style.display = 'block';
+  document.getElementById('combine-card').style.display   = 'none';
+  document.getElementById('final-output').style.display   = 'none';
+  setVoiceStatus('running', n > 1 ? `Generating ${n} segments...` : 'Generating...');
+  setVProg(5, 'Reading settings...');
+
+  const ctrl      = document.getElementById('control-instruction').value.trim();
+  const usePrompt = document.getElementById('ultimate-toggle').classList.contains('on');
+  const promptText= document.getElementById('prompt-text').value.trim();
+  const cfgVal    = parseFloat(document.getElementById('cfg-val').value);
+  const ditSteps  = parseInt(document.getElementById('dit-steps').value);
+  const doNorm    = document.getElementById('normalize-toggle').classList.contains('on');
+  const denoise   = document.getElementById('denoise-toggle').classList.contains('on');
+  const refFile   = document.getElementById('ref-audio-input')._file || null;
+
+  // Update segment title
+  document.getElementById('segments-title').textContent = n > 1 ? `${n} Audio Segments` : 'Audio Output';
+
+  // Build segment cards in output area
+  const outArea = document.getElementById('audio-output-area');
+  outArea.innerHTML = segments.map((s,i) => `
+    <div id="seg-card-${i}" style="padding:12px 14px;background:var(--bg3);border-radius:var(--radius);margin-bottom:8px;border:1px solid var(--border);transition:border-color 0.3s">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:0.75rem;font-weight:700;color:var(--text3)">Clip ${i+1} / ${n} · ~${Math.round(s.length/CHARS_PER_SEC)}s · ${s.length} chars</div>
+        <div class="status-badge status-idle" id="seg-status-${i}"><div class="status-dot"></div>Waiting</div>
+      </div>
+      <div style="font-size:0.78rem;color:var(--text2);margin-bottom:8px;line-height:1.5">${s.substring(0,120)}${s.length>120?'…':''}</div>
+      <div id="seg-audio-${i}" style="font-size:0.75rem;color:var(--text3)">—</div>
+    </div>`).join('');
+
+  document.getElementById('output-status').className = 'status-badge status-running';
+  document.getElementById('output-status').innerHTML = '<div class="status-dot spin"></div>Generating';
+
+  try {
+    // Upload reference audio once (reused for all segments)
+    setVProg(8, 'Uploading reference audio...');
+    let refWav = null;
+    if (refFile) {
+      const fd = new FormData(); fd.append('files', refFile);
+      const uploadRes = await fetch(API+'/gradio_api/upload', {method:'POST', body:fd});
+      if (uploadRes.ok) {
+        const paths = await uploadRes.json();
+        refWav = {path: paths[0], meta: {_type:'gradio.FileData'}, orig_name: refFile.name};
+      }
+    }
+
+    // Generate each segment sequentially
+    for (let i = 0; i < n; i++) {
+      const segText = segments[i];
+      const pct     = 10 + 85*(i/n);
+      setVProg(pct, `Generating clip ${i+1} of ${n}...`);
+
+      // Mark card active
+      const card = document.getElementById(`seg-card-${i}`);
+      card.style.borderColor = 'var(--accent)';
+      card.style.borderWidth  = '2px';
+      const st = document.getElementById(`seg-status-${i}`);
+      st.className = 'status-badge status-running';
+      st.innerHTML = '<div class="status-dot spin"></div>Generating';
+      document.getElementById(`seg-audio-${i}`).textContent = 'Connecting to VoxCPM2...';
+
+      let audioURL;
+      try {
+        audioURL = await callVoxCPM2(segText, ctrl, refWav, usePrompt, promptText, cfgVal, doNorm, denoise, ditSteps);
+      } catch(segErr) {
+        card.style.borderColor = 'var(--red)';
+        st.className = 'status-badge status-err';
+        st.innerHTML = '<div class="status-dot"></div>Error';
+        document.getElementById(`seg-audio-${i}`).innerHTML =
+          `<span style="color:var(--red);font-size:0.75rem">⚠ ${segErr.message}</span>`;
+        throw segErr; // re-throw to stop the loop
+      }
+
+      // Fetch blob with CORS + full error handling
+      let blob, blobURL;
+      try {
+        const r = await fetch(audioURL, { mode: 'cors', credentials: 'omit' });
+        if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
+        blob    = await r.blob();
+        if (blob.size === 0) throw new Error('Empty audio response');
+        blobURL = URL.createObjectURL(blob);
+        console.log('[VoxCPM2] Clip', i+1, 'fetched OK, size:', blob.size, 'blobURL:', blobURL);
+      } catch(fetchErr) {
+        console.error('[VoxCPM2] Blob fetch failed:', fetchErr, 'URL was:', audioURL);
+        // Fallback: use audioURL directly and let browser try
+        blob    = new Blob([], {type:'audio/wav'});
+        blobURL = audioURL; // direct URL fallback
+      }
+      generatedSegments.push({text: segText, url: audioURL, blob, blobURL});
+
+      // Update card
+      card.style.borderColor = 'var(--green)';
+      card.style.borderWidth  = '1px';
+      st.className = 'status-badge status-done';
+      st.innerHTML = '<div class="status-dot"></div>Done';
+      const audioEl = document.createElement('audio');
+      audioEl.controls = true;
+      audioEl.style.cssText = 'width:100%;border-radius:6px;margin-bottom:4px';
+      audioEl.onerror = (e) => {
+        console.error('[VoxCPM2] Audio element error:', e, audioEl.error);
+        const errDiv = document.getElementById(`seg-audio-err-${i}`);
+        if (errDiv) errDiv.textContent = 'Playback error: ' + (audioEl.error ? audioEl.error.message : 'unknown') + ' — but download still works';
+      };
+      const src = document.createElement('source');
+      src.src  = blobURL;
+      src.type = 'audio/wav';
+      audioEl.appendChild(src);
+      const segDiv = document.getElementById(`seg-audio-${i}`);
+      segDiv.innerHTML = '';
+      segDiv.appendChild(audioEl);
+      segDiv.insertAdjacentHTML('beforeend',
+        `<div id="seg-audio-err-${i}" style="font-size:0.72rem;color:var(--red);margin-bottom:4px"></div>
+         <button class="btn btn-outline" style="font-size:0.72rem;padding:4px 10px" onclick="downloadSingleAudio(${i})">⬇ Clip ${i+1}</button>`);
+    }
+
+    // All segments done
+    setVProg(100, `All ${n} clip${n>1?'s':''} generated!`);
+    document.getElementById('audio-actions').style.display = 'flex';
+    document.getElementById('audio-meta').textContent =
+      `${n} segment${n>1?'s':''} · ${Math.round(generatedSegments.reduce((a,s)=>a+s.blob.size,0)/1024)}KB total`;
+    document.getElementById('output-status').className = 'status-badge status-done';
+    document.getElementById('output-status').innerHTML = `<div class="status-dot"></div>${n} clip${n>1?'s':''} ready`;
+    setVoiceStatus('done', n > 1 ? `${n} segments ready` : 'Speech ready');
+
+    // Show combine card
+    document.getElementById('combine-card').style.display = 'block';
+    document.getElementById('combine-count').textContent  = n;
+
+  } catch(e) {
+    setVoiceStatus('err', 'Error: ' + e.message);
+    setVProg(0, 'Failed — ' + e.message);
+    console.error('VoxCPM2 error:', e);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🔊 Generate Speech';
+  setTimeout(() => document.getElementById('voice-progress').style.display = 'none', 3000);
 }
 
 function setVProg(pct, label) {
-  document.getElementById('vprog-fill').style.width=pct+'%';
-  document.getElementById('vprog-label').textContent=label;
+  document.getElementById('vprog-fill').style.width = pct+'%';
+  document.getElementById('vprog-label').textContent = label;
 }
-
 function setVoiceStatus(type, text) {
-  const el=document.getElementById('voice-status');
-  el.className='status-badge status-'+type;
-  el.innerHTML=`<div class="status-dot${type==='running'?' spin':''}"></div> ${text}`;
+  const el = document.getElementById('voice-status');
+  el.className = 'status-badge status-'+type;
+  el.innerHTML = `<div class="status-dot${type==='running'?' spin':''}"></div> ${text}`;
 }
 
-function downloadAudio() {
-  if(!audioBlob) return;
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(audioBlob);
-  a.download='voxcpm2_output.wav';
+function downloadSingleAudio(idx) {
+  if (!generatedSegments[idx]) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(generatedSegments[idx].blob);
+  a.download = `voxcpm2_clip_${idx+1}.wav`;
   a.click();
+}
+function downloadAllAudio() {
+  generatedSegments.forEach((s,i) => setTimeout(() => downloadSingleAudio(i), i*400));
 }
 
 function resetVoice() {
-  document.getElementById('target-text').value='';
-  document.getElementById('control-instruction').value='';
-  document.getElementById('ref-audio-input').value='';
-  document.getElementById('ref-audio-preview').style.display='none';
-  document.getElementById('audio-output-area').innerHTML='<div class="output-empty">Generated audio will appear here</div>';
-  document.getElementById('audio-actions').style.display='none';
+  document.getElementById('target-text').value = '';
+  document.getElementById('control-instruction').value = '';
+  document.getElementById('ref-audio-input').value = '';
+  document.getElementById('ref-audio-preview').style.display = 'none';
+  document.getElementById('audio-output-area').innerHTML =
+    '<div class="output-area"><div class="output-empty">Generated audio segments will appear here</div></div>';
+  document.getElementById('audio-actions').style.display   = 'none';
+  document.getElementById('combine-card').style.display    = 'none';
   document.getElementById('ultimate-toggle').classList.remove('on');
   document.getElementById('normalize-toggle').classList.remove('on');
   document.getElementById('denoise-toggle').classList.remove('on');
-  document.getElementById('prompt-text-wrap').style.display='none';
-  document.querySelectorAll('#preset-tags .tag').forEach(t=>t.classList.remove('active'));
+  document.getElementById('prompt-text-wrap').style.display = 'none';
+  document.querySelectorAll('#preset-tags .tag').forEach(t => t.classList.remove('active'));
   setVoiceStatus('idle','Idle');
-  document.getElementById('output-status').className='status-badge status-idle';
-  document.getElementById('output-status').innerHTML='<div class="status-dot"></div>Waiting';
+  document.getElementById('output-status').className = 'status-badge status-idle';
+  document.getElementById('output-status').innerHTML = '<div class="status-dot"></div>Waiting';
   document.getElementById('ref-audio-input')._file = null;
+  generatedSegments = []; finalBlob = null;
+  analyzeText();
 }
 
+// ─── AUDIO CONCATENATION (Web Audio API) ─────────────────────────────────────
+async function concatAudioBlobs(blobs) {
+  const audioCtx = new AudioContext();
+  const decoded  = await Promise.all(blobs.map(b => b.arrayBuffer().then(ab => audioCtx.decodeAudioData(ab))));
+  const sr       = decoded[0].sampleRate;
+  const ch       = decoded[0].numberOfChannels;
+  const totalLen = decoded.reduce((a,b) => a + b.length, 0);
+
+  const offline = new OfflineAudioContext(ch, totalLen, sr);
+  let offset = 0;
+  for (const buf of decoded) {
+    const src = offline.createBufferSource();
+    src.buffer = buf;
+    src.connect(offline.destination);
+    src.start(offline.currentTime + offset/sr);
+    offset += buf.length;
+  }
+  const rendered = await offline.startRendering();
+  return new Blob([audioBufferToWav(rendered)], {type:'audio/wav'});
+}
+
+function audioBufferToWav(buffer) {
+  const numCh = buffer.numberOfChannels, sr = buffer.sampleRate, len = buffer.length;
+  const out   = new ArrayBuffer(44 + len*numCh*2);
+  const view  = new DataView(out);
+  const ws    = (o,s) => { for(let i=0;i<s.length;i++) view.setUint8(o+i,s.charCodeAt(i)); };
+  ws(0,'RIFF'); view.setUint32(4,36+len*numCh*2,true);
+  ws(8,'WAVE'); ws(12,'fmt '); view.setUint32(16,16,true);
+  view.setUint16(20,1,true); view.setUint16(22,numCh,true);
+  view.setUint32(24,sr,true); view.setUint32(28,sr*numCh*2,true);
+  view.setUint16(32,numCh*2,true); view.setUint16(34,16,true);
+  ws(36,'data'); view.setUint32(40,len*numCh*2,true);
+  let off = 44;
+  for (let i=0;i<len;i++) for (let c=0;c<numCh;c++) {
+    const s = Math.max(-1, Math.min(1, buffer.getChannelData(c)[i]));
+    view.setInt16(off, s<0 ? s*0x8000 : s*0x7FFF, true); off+=2;
+  }
+  return out;
+}
+
+// ─── COMBINE VIDEO + AUDIO → FINAL DOWNLOAD ──────────────────────────────────
+async function combineAndDownload() {
+  if (!generatedSegments.length) return alert('Generate audio segments first!');
+  const btn = document.getElementById('combine-btn');
+  btn.disabled = true; btn.textContent = '⏳ Combining...';
+  document.getElementById('combine-progress').style.display = 'block';
+  document.getElementById('final-output').style.display = 'none';
+
+  try {
+    setCProg(5, 'Concatenating audio segments...');
+    const combinedAudio = await concatAudioBlobs(generatedSegments.map(s => s.blob));
+    combinedAudioBlob = combinedAudio;
+    setCProg(30, 'Audio merged successfully');
+
+    if (!videoBlob) {
+      // No video — just download the combined audio
+      finalBlob = combinedAudio;
+      setCProg(100, 'Done! (No video — audio only)');
+      showFinalOutput(URL.createObjectURL(finalBlob), false, finalBlob.size);
+      btn.disabled=false; btn.textContent='🎬 Combine & Download Final Video'; return;
+    }
+
+    setCProg(40, 'Loading video track...');
+    const videoEl = document.createElement('video');
+    videoEl.src = URL.createObjectURL(videoBlob);
+    videoEl.muted = true;
+    await new Promise(r => { videoEl.onloadedmetadata = r; videoEl.load(); });
+
+    // Get audio duration
+    const audioEl = new Audio(URL.createObjectURL(combinedAudio));
+    await new Promise(r => { audioEl.onloadedmetadata = r; audioEl.load(); });
+    const audioDur = audioEl.duration;
+    const videoDur = videoEl.duration;
+    // Audio is master length — video loops if shorter than audio
+    const totalDur = audioDur;
+    const needsLoop = videoDur < audioDur;
+
+    setCProg(50, 'Setting up canvas recorder...');
+    const W = videoEl.videoWidth  || 1920;
+    const H = videoEl.videoHeight || 1080;
+    const FPS = 30;
+    const canvas = document.createElement('canvas'); canvas.width=W; canvas.height=H;
+    const ctx    = canvas.getContext('2d');
+
+    // Enable seamless looping on the video element
+    videoEl.loop = needsLoop;
+
+    // Decode audio into AudioContext for streaming
+    const audioCtx  = new AudioContext();
+    const audioData = await combinedAudio.arrayBuffer();
+    const audioBuf  = await audioCtx.decodeAudioData(audioData);
+    const src       = audioCtx.createBufferSource(); src.buffer = audioBuf;
+    const dest      = audioCtx.createMediaStreamDestination(); src.connect(dest);
+
+    const videoStream = canvas.captureStream(FPS);
+    const combined    = new MediaStream([...videoStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+    const avMime = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+    const rec         = new MediaRecorder(combined, {mimeType: avMime, videoBitsPerSecond:6000000});
+    const chunks      = [];
+    rec.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
+
+    const loopLabel = needsLoop
+      ? ` (video loops every ${videoDur.toFixed(1)}s)`
+      : '';
+    rec.start(200); src.start(0); videoEl.currentTime=0; videoEl.play();
+    setCProg(60, 'Recording combined video + audio' + loopLabel + '...');
+
+    const t0 = performance.now();
+    await new Promise(resolve => {
+      function frame() {
+        const elapsed = (performance.now()-t0)/1000;
+        if (elapsed >= totalDur) { resolve(); return; }
+        const loopInfo = needsLoop
+          ? ` · loop ${Math.floor(elapsed/videoDur)+1}`
+          : '';
+        setCProg(
+          Math.min(94, 60+34*(elapsed/totalDur)),
+          `Recording ${elapsed.toFixed(1)}s / ${totalDur.toFixed(1)}s${loopInfo}`
+        );
+        ctx.drawImage(videoEl, 0, 0, W, H);
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    });
+
+    videoEl.pause(); videoEl.loop=false; rec.stop(); src.stop();
+    await new Promise(r => rec.onstop = r);
+    finalBlob = new Blob(chunks, {type:'video/webm'});
+    setCProg(100, 'Final video ready!');
+    showFinalOutput(URL.createObjectURL(finalBlob), true, finalBlob.size);
+
+  } catch(e) {
+    setCProg(0, 'Error: '+e.message);
+    console.error('Combine error:', e);
+  }
+  btn.disabled=false; btn.textContent='🎬 Combine & Download Final Video';
+}
+
+function setCProg(pct, label) {
+  document.getElementById('cprog-fill').style.width = pct+'%';
+  document.getElementById('cprog-label').textContent = label;
+}
+function showFinalOutput(url, isVideo, size) {
+  const el = document.getElementById('final-output');
+  el.style.display = 'block';
+  document.getElementById('final-video').src = url;
+  document.getElementById('final-meta').textContent =
+    `${(size/1024/1024).toFixed(1)} MB · WebM · ${isVideo?'Video + Audio':'Audio only'}`;
+  el.scrollIntoView({behavior:'smooth', block:'center'});
+}
+async function downloadFinal(btn) {
+  if (!finalBlob) return;
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Loading converter...';
+
+  try {
+    // Dynamically load FFmpeg.wasm (v0.11.x — no SharedArrayBuffer required)
+    if (!window._ffmpegLoaded) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js';
+        s.onload = resolve;
+        s.onerror = () => reject(new Error('Failed to load FFmpeg.wasm'));
+        document.head.appendChild(s);
+      });
+      window._ffmpegLoaded = true;
+    }
+
+    btn.textContent = '⏳ Starting FFmpeg...';
+    const { createFFmpeg, fetchFile } = FFmpeg;
+
+    // Track progress manually since ratio is unreliable in v0.11.x
+    let progressStage = 0;
+    const stages = [
+      '⏳ Loading encoder...',
+      '⏳ Writing video data...',
+      '⏳ Converting WebM → MP4...',
+      '⏳ Finalizing...',
+      '⏳ Reading output...'
+    ];
+
+    const ffmpeg = createFFmpeg({
+      log: false,
+      progress: ({ ratio, time }) => {
+        // ratio is often NaN in v0.11.x — use time-based progress instead
+        if (typeof ratio === 'number' && !isNaN(ratio) && ratio > 0) {
+          const pct = Math.min(99, Math.round(ratio * 100));
+          btn.textContent = `⏳ Converting ${pct}%...`;
+        } else if (typeof time === 'number' && !isNaN(time)) {
+          btn.textContent = `⏳ Encoding... ${(time/1000000).toFixed(1)}s`;
+        }
+        // else: stay on current stage label — don't update with NaN
+      }
+    });
+
+    await ffmpeg.load();
+    btn.textContent = '⏳ Writing video data...';
+
+    // Write WebM blob into FFmpeg virtual FS
+    const webmData = new Uint8Array(await finalBlob.arrayBuffer());
+    ffmpeg.FS('writeFile', 'input.webm', webmData);
+
+    btn.textContent = '⏳ Converting WebM → MP4...';
+
+    // Convert with error logging enabled for debugging
+    await ffmpeg.run(
+      '-i', 'input.webm',
+      '-c:v', 'libx264',
+      '-preset', 'ultrafast',  // faster than 'fast', better for browser
+      '-crf', '23',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-movflags', '+faststart',
+      '-y',
+      'output.mp4'
+    );
+
+    btn.textContent = '⏳ Reading output...';
+    const mp4Data = ffmpeg.FS('readFile', 'output.mp4');
+    if (!mp4Data || mp4Data.length === 0) throw new Error('FFmpeg produced empty output — conversion failed');
+    const mp4Blob = new Blob([mp4Data.buffer], { type: 'video/mp4' });
+
+    // Clean up FS
+    try { ffmpeg.FS('unlink', 'input.webm'); } catch(e) {}
+    try { ffmpeg.FS('unlink', 'output.mp4'); } catch(e) {}
+
+    // Trigger download
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(mp4Blob);
+    a.download = 'voxcpm2_final.mp4';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+
+    const sizeMB = (mp4Blob.size / 1024 / 1024).toFixed(1);
+    btn.textContent = `✅ Downloaded! (${sizeMB}MB)`;
+    setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 3000);
+
+  } catch(e) {
+    console.error('MP4 convert error:', e);
+    btn.textContent = '⚠ Failed — check console';
+    alert('MP4 conversion failed: ' + e.message + '\n\nTip: Try downloading as WebM instead — most browsers and players support it.');
+    setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 3000);
+  }
+}
+
+// Fallback: direct WebM download if user wants it
+function downloadWebM() {
+  if (!finalBlob) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(finalBlob);
+  a.download = 'voxcpm2_final.webm'; a.click();
+}
+
+async function downloadFinalMP3(btn) {
+  if (!combinedAudioBlob) return alert('No combined audio yet — run Combine first.');
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Converting to MP3...';
+
+  try {
+    // Decode WAV into AudioBuffer
+    const arrayBuf  = await combinedAudioBlob.arrayBuffer();
+    const audioCtx  = new AudioContext();
+    const audioBuf  = await audioCtx.decodeAudioData(arrayBuf);
+    await audioCtx.close();
+
+    // Encode to MP3 using lamejs (loaded from CDN)
+    btn.textContent = '⏳ Encoding MP3...';
+    const mp3Blob = await encodeMP3(audioBuf);
+
+    // Download
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(mp3Blob);
+    a.download = 'voxcpm2_final_audio.mp3';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    btn.textContent = '✅ Downloaded!';
+    setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 2000);
+  } catch(e) {
+    console.error('MP3 encode error:', e);
+    btn.textContent = '⚠ Error — check console';
+    setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 3000);
+  }
+}
+
+// Encode AudioBuffer → MP3 Blob using lamejs
+async function encodeMP3(audioBuffer) {
+  // Dynamically load lamejs if not already loaded
+  if (!window.lamejs) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Failed to load lamejs MP3 encoder'));
+      document.head.appendChild(s);
+    });
+  }
+
+  const sampleRate = audioBuffer.sampleRate;
+  const numCh      = Math.min(audioBuffer.numberOfChannels, 2); // max stereo
+  const kbps       = 128;
+  const mp3enc     = new lamejs.Mp3Encoder(numCh, sampleRate, kbps);
+  const blockSize  = 1152; // lamejs required block size
+  const mp3Data    = [];
+
+  // Get channel PCM data as Int16
+  function floatTo16Bit(floatArr) {
+    const int16 = new Int16Array(floatArr.length);
+    for (let i = 0; i < floatArr.length; i++) {
+      const s = Math.max(-1, Math.min(1, floatArr[i]));
+      int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    return int16;
+  }
+
+  const leftPCM  = floatTo16Bit(audioBuffer.getChannelData(0));
+  const rightPCM = numCh > 1
+    ? floatTo16Bit(audioBuffer.getChannelData(1))
+    : leftPCM;
+
+  // Encode in blocks
+  for (let i = 0; i < leftPCM.length; i += blockSize) {
+    const leftChunk  = leftPCM.subarray(i, i + blockSize);
+    const rightChunk = rightPCM.subarray(i, i + blockSize);
+    const encoded    = numCh > 1
+      ? mp3enc.encodeBuffer(leftChunk, rightChunk)
+      : mp3enc.encodeBuffer(leftChunk);
+    if (encoded.length > 0) mp3Data.push(new Uint8Array(encoded));
+    // Yield to UI every 50 blocks to avoid freezing
+    if (i % (blockSize * 50) === 0) await new Promise(r => setTimeout(r, 0));
+  }
+
+  // Flush remaining frames
+  const flushed = mp3enc.flush();
+  if (flushed.length > 0) mp3Data.push(new Uint8Array(flushed));
+
+  return new Blob(mp3Data, { type: 'audio/mpeg' });
+}
+
+// ─── AI IMAGE TO VIDEO (FAL.ai WAN 2.1) ─────────────────────────────────────
+let falKey = '';
+
+function loadFalSettings() {
+  falKey = sessionStorage.getItem('fal_key') || '';
+  if (falKey) document.getElementById('fal-key').value = falKey;
+}
+
+function toggleFalKeyVis() {
+  const inp = document.getElementById('fal-key');
+  const eye = document.getElementById('fal-key-eye');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  eye.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+
+async function batchImageToVideo() {
+  falKey = document.getElementById('fal-key').value.trim();
+  if (!falKey) return alert('Please enter your FAL.ai API key.\n\nGet a free key at fal.ai → Dashboard → API Keys');
+
+  const imgItems = mediaItems.map((m, i) => ({item: m, idx: i})).filter(({item}) => item.type === 'image' && item.src);
+  if (!imgItems.length) return alert('Upload at least one image first.');
+
+  sessionStorage.setItem('fal_key', falKey);
+
+  const btn = document.getElementById('i2v-btn');
+  btn.disabled = true; btn.textContent = '⏳ Processing...';
+  document.getElementById('i2v-progress').style.display = 'block';
+  setI2VStatus('running', `Converting ${imgItems.length} image${imgItems.length > 1 ? 's' : ''}...`);
+
+  const prompt = (document.getElementById('i2v-prompt').value || '').trim() || 'Smooth cinematic motion, high quality';
+  const itemsDiv = document.getElementById('i2v-items');
+  itemsDiv.innerHTML = imgItems.map(({item, idx}) =>
+    `<div class="i2v-item" id="i2v-item-${idx}">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:0.78rem;font-weight:700;color:var(--text2)">${item.name}</span>
+        <div class="status-badge status-idle" id="i2v-item-st-${idx}"><div class="status-dot"></div>Queued</div>
+      </div>
+    </div>`
+  ).join('');
+
+  let done = 0;
+  for (const {item, idx} of imgItems) {
+    const stBadge = document.getElementById(`i2v-item-st-${idx}`);
+    const itemEl  = document.getElementById(`i2v-item-${idx}`);
+    setI2VBadge(stBadge, 'running', 'Sending...');
+    setI2VProg(Math.round(done / imgItems.length * 90), `Image ${done + 1}/${imgItems.length}: ${item.name}`);
+    try {
+      const videoUrl = await callFalWan(item.src, prompt, stBadge);
+      setI2VBadge(stBadge, 'running', 'Downloading...');
+      const res = await fetch(videoUrl);
+      const blob = await res.blob();
+      const blobURL = URL.createObjectURL(blob);
+      const tmpVid = document.createElement('video');
+      tmpVid.src = blobURL; tmpVid.muted = true;
+      await new Promise(r => { tmpVid.onloadedmetadata = r; setTimeout(r, 2000); tmpVid.load(); });
+      mediaItems[idx] = {
+        type: 'video',
+        src: blobURL,
+        name: item.name.replace(/\.(png|jpe?g|webp|gif)$/i, '_ai.mp4'),
+        blob,
+        enhanced: false,
+        duration: tmpVid.duration || 5
+      };
+      setI2VBadge(stBadge, 'done', '✓ Done');
+      if (itemEl) itemEl.style.borderColor = 'var(--green)';
+    } catch (err) {
+      setI2VBadge(stBadge, 'err', '⚠ Failed');
+      if (itemEl) {
+        itemEl.style.borderColor = 'var(--red)';
+        itemEl.insertAdjacentHTML('beforeend', `<div style="font-size:0.72rem;color:var(--red);margin-top:4px">${err.message}</div>`);
+      }
+    }
+    done++;
+  }
+
+  setI2VProg(100, `Done — ${done}/${imgItems.length} processed`);
+  setI2VStatus('done', `${done} video${done !== 1 ? 's' : ''} ready`);
+  btn.disabled = false; btn.textContent = '↺ Re-generate Videos';
+  renderGrid();
+}
+
+async function callFalWan(imageDataURL, prompt, stBadge) {
+  const BASE = 'https://queue.fal.run/fal-ai/wan/i2v/480p';
+  setI2VBadge(stBadge, 'running', 'Queueing...');
+
+  const sub = await fetch(BASE, {
+    method: 'POST',
+    headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image_url: imageDataURL, prompt, num_frames: 81, fps: 16, guidance_scale: 5.0 })
+  });
+  if (!sub.ok) {
+    const txt = await sub.text();
+    throw new Error(`FAL.ai ${sub.status}: ${txt.substring(0, 120)}`);
+  }
+  const { request_id } = await sub.json();
+
+  let polls = 0;
+  while (polls++ < 200) {
+    await new Promise(r => setTimeout(r, 3000));
+    setI2VBadge(stBadge, 'running', `⏳ ${Math.round(polls * 3)}s...`);
+    const sr = await fetch(`${BASE}/requests/${request_id}/status`, {
+      headers: { 'Authorization': `Key ${falKey}` }
+    });
+    const sd = await sr.json();
+    if (sd.status === 'COMPLETED') {
+      const rr = await fetch(`${BASE}/requests/${request_id}`, { headers: { 'Authorization': `Key ${falKey}` } });
+      const rd = await rr.json();
+      const url = rd.video?.url || rd.output?.video?.url;
+      if (!url) throw new Error('No video URL in FAL.ai response');
+      return url;
+    }
+    if (sd.status === 'FAILED') throw new Error('FAL.ai generation failed: ' + (sd.error || 'unknown'));
+  }
+  throw new Error('FAL.ai timeout after 10 minutes');
+}
+
+function setI2VStatus(type, text) {
+  const el = document.getElementById('i2v-status');
+  el.className = 'status-badge status-' + type;
+  el.innerHTML = `<div class="status-dot${type === 'running' ? ' spin' : ''}"></div> ${text}`;
+}
+
+function setI2VBadge(el, type, text) {
+  el.className = 'status-badge status-' + type;
+  el.innerHTML = `<div class="status-dot${type === 'running' ? ' spin' : ''}"></div>${text}`;
+}
+
+function setI2VProg(pct, label) {
+  document.getElementById('i2v-prog-fill').style.width = pct + '%';
+  document.getElementById('i2v-prog-label').textContent = label;
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+analyzeText();
 checkAPI();
+loadEnhanceSettings();
+loadFalSettings();
 </script>
 </body>
 </html>
