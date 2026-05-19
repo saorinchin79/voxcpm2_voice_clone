@@ -2186,7 +2186,6 @@ function resizeToLTX(dataURL) {
 }
 
 async function callFalWan(imageDataURL, prompt, stBadge) {
-  const BASE = 'https://queue.fal.run/fal-ai/ltx-video/image-to-video';
 
   // Resize to 768x512 (LTX requirement)
   setI2VBadge(stBadge, 'running', 'Resizing...');
@@ -2194,18 +2193,15 @@ async function callFalWan(imageDataURL, prompt, stBadge) {
   try { resized = await resizeToLTX(imageDataURL); }
   catch(e) { console.warn('Resize failed, using original:', e.message); resized = imageDataURL; }
 
-  // Use resized base64 directly — FAL.ai inference accepts data URLs
-  const imageUrl = resized;
-
-  // Submit inference job
-  setI2VBadge(stBadge, 'running', 'Submitting...');
-  const sub = await fetch(BASE, {
+  // Submit via server proxy — uploads image to FAL.ai storage server-side (no CORS)
+  setI2VBadge(stBadge, 'running', 'Uploading & submitting...');
+  const sub = await fetch('/api/i2v', {
     method: 'POST',
-    headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image_url: imageUrl, prompt, num_inference_steps: 30, guidance_scale: 3, negative_prompt: 'blur, distort, low quality, worst quality' })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fal_key: falKey, image_url: resized, prompt })
   });
   const subData = await falJson(sub);
-  if (!sub.ok) throw new Error(`Submit failed (${sub.status}): ${JSON.stringify(subData).substring(0, 200)}`);
+  if (!sub.ok) throw new Error(`Submit failed (${sub.status}): ` + (subData.error || JSON.stringify(subData).substring(0, 200)));
 
   // Use the exact URLs returned by FAL.ai — don't construct them manually
   const statusUrl   = subData.status_url   || `${BASE}/requests/${subData.request_id}/status`;
