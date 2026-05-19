@@ -2203,8 +2203,11 @@ async function callFalWan(imageDataURL, prompt, stBadge) {
   });
   const subData = await falJson(sub);
   if (!sub.ok) throw new Error(`Submit failed (${sub.status}): ${JSON.stringify(subData).substring(0, 200)}`);
-  const request_id = subData.request_id;
-  if (!request_id) throw new Error('No request_id: ' + JSON.stringify(subData).substring(0, 200));
+
+  // Use the exact URLs returned by FAL.ai — don't construct them manually
+  const statusUrl   = subData.status_url   || `${BASE}/requests/${subData.request_id}/status`;
+  const responseUrl = subData.response_url || `${BASE}/requests/${subData.request_id}`;
+  if (!subData.request_id && !subData.status_url) throw new Error('No request_id or status_url: ' + JSON.stringify(subData).substring(0, 200));
 
   // Poll — 2s interval, 3 min hard timeout
   const t0 = Date.now();
@@ -2213,8 +2216,13 @@ async function callFalWan(imageDataURL, prompt, stBadge) {
     if (elapsed > 180) throw new Error(`Timeout — no result after ${elapsed}s`);
     await new Promise(r => setTimeout(r, 2000));
 
-    const sr = await fetch(`${BASE}/requests/${request_id}/status`, { headers: { 'Authorization': `Key ${falKey}` } });
-    if (!sr.ok) { setI2VBadge(stBadge, 'running', `Poll err ${elapsed}s, retrying...`); continue; }
+    const sr = await fetch(statusUrl, { headers: { 'Authorization': `Key ${falKey}` } });
+    if (!sr.ok) {
+      const errText = await sr.text().catch(() => '');
+      setI2VBadge(stBadge, 'running', `Poll ${sr.status} · ${elapsed}s`);
+      console.warn('Poll HTTP error', sr.status, errText.substring(0, 100));
+      continue;
+    }
     const sd = await falJson(sr);
 
     if (sd.status === 'IN_QUEUE') {
@@ -2224,7 +2232,7 @@ async function callFalWan(imageDataURL, prompt, stBadge) {
       setI2VBadge(stBadge, 'running', `Generating · ${elapsed}s`);
     } else if (sd.status === 'COMPLETED') {
       if (sd.error) throw new Error('FAL.ai error: ' + sd.error);
-      const rr = await fetch(`${BASE}/requests/${request_id}`, { headers: { 'Authorization': `Key ${falKey}` } });
+      const rr = await fetch(responseUrl, { headers: { 'Authorization': `Key ${falKey}` } });
       const rd = await falJson(rr);
       const url = rd.video?.url || rd.output?.video?.url;
       if (!url) throw new Error('No video URL in result: ' + JSON.stringify(rd).substring(0, 200));
