@@ -302,14 +302,14 @@
       <div class="card fade-in" id="i2v-card" style="animation-delay:0.15s;border:1px solid rgba(124,110,247,0.25)">
         <div class="section-header">
           <div>
-            <div class="card-title" style="color:var(--accent2)">✦ AI Image to Video <span style="color:var(--text3);font-weight:400">· Kling v3 Pro · via FAL.ai</span></div>
+            <div class="card-title" style="color:var(--accent2)">✦ AI Image to Video <span style="color:var(--text3);font-weight:400">· Kling v1 Standard · via FAL.ai</span></div>
             <div class="section-title" style="font-size:0.95rem">Convert Each Image → 5s Video</div>
           </div>
           <div class="status-badge status-idle" id="i2v-status"><div class="status-dot"></div>Idle</div>
         </div>
         <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:0.9rem;margin-bottom:1rem">
           <div style="font-size:0.78rem;font-weight:700;color:var(--accent2);margin-bottom:5px">How it works</div>
-          <div style="font-size:0.75rem;color:var(--text2);line-height:1.7">Each uploaded image is sent to <strong style="color:var(--text)">Kling v3 Pro</strong> (hosted on FAL.ai) which generates a <strong style="color:var(--text)">5-second cinematic video clip</strong> per image. Same FAL.ai key as before — free credits on signup.</div>
+          <div style="font-size:0.75rem;color:var(--text2);line-height:1.7">Each uploaded image is sent to <strong style="color:var(--text)">Kling v1 Standard</strong> (hosted on FAL.ai) which generates a <strong style="color:var(--text)">5-second cinematic video clip</strong> per image. Faster and lower cost than Pro — same FAL.ai key.</div>
           <div style="margin-top:6px;font-size:0.73rem;color:var(--text3)">Get a free key: fal.ai → Sign up → Dashboard → API Keys</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
@@ -2161,7 +2161,7 @@ async function falJson(res) {
 }
 
 async function callFalWan(imageDataURL, prompt, stBadge) {
-  const BASE = 'https://queue.fal.run/fal-ai/kling-video/v3/pro/image-to-video';
+  const BASE = 'https://queue.fal.run/fal-ai/kling-video/v1/standard/image-to-video';
 
   // Upload image to FAL.ai storage first — avoids sending MB-sized base64 in the POST body
   setI2VBadge(stBadge, 'running', 'Uploading image...');
@@ -2186,7 +2186,7 @@ async function callFalWan(imageDataURL, prompt, stBadge) {
   const sub = await fetch(BASE, {
     method: 'POST',
     headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ start_image_url: imageUrl, prompt, duration: 5, negative_prompt: 'blur, distort, low quality' })
+    body: JSON.stringify({ image_url: imageUrl, prompt, duration: 5, negative_prompt: 'blur, distort, low quality' })
   });
   const subData = await falJson(sub);
   if (!sub.ok) throw new Error(`FAL.ai submit failed (${sub.status}): ${JSON.stringify(subData).substring(0, 120)}`);
