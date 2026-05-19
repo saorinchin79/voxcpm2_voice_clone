@@ -109,6 +109,7 @@ class SecureHandler(SimpleHTTPRequestHandler):
 
 
 if __name__ == '__main__':
+    os.chdir(Path(__file__).parent)   # serve files relative to this script
     port = int(os.environ.get('PORT', 8080))
     server = HTTPServer(('', port), SecureHandler)
     print(f'Studio running at http://localhost:{port}/studio.html')
