@@ -735,7 +735,8 @@
       <div class="card fade-in" style="animation-delay:0.2s">
         <div class="card-title">API Connection</div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div style="font-size:0.8rem;font-family:var(--mono);color:var(--text2)">localhost:8808</div>
+          <div style="font-size:0.8rem;font-family:var(--mono);color:var(--text2)" id="api-host-label">localhost:8808</div>
+          <script>document.getElementById('api-host-label').textContent = location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? 'localhost:8808' : location.host;</script>
           <div class="status-badge status-idle" id="api-status"><div class="status-dot"></div>Unknown</div>
         </div>
         <button class="btn btn-outline btn-full" style="font-size:0.8rem" onclick="checkAPI()">↺ Test Connection</button>
@@ -755,7 +756,9 @@
 </div>
 
 <script>
-const API = 'http://localhost:8808';
+const API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:8808'
+  : '';
 let mediaItems = [], videoBlob = null, selectedFX = 'tectonic', finalBlob = null, generatedVideoURL = null, combinedAudioBlob = null;
 let frameOverlayImg = null; // PNG frame overlay image element
 let generatedSegments = []; // [{text, url, blob}]
