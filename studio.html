@@ -302,14 +302,14 @@
       <div class="card fade-in" id="i2v-card" style="animation-delay:0.15s;border:1px solid rgba(124,110,247,0.25)">
         <div class="section-header">
           <div>
-            <div class="card-title" style="color:var(--accent2)">✦ AI Image to Video <span style="color:var(--text3);font-weight:400">· Kling v1 Standard · via FAL.ai</span></div>
+            <div class="card-title" style="color:var(--accent2)">✦ AI Image to Video <span style="color:var(--text3);font-weight:400">· LTX Video · via FAL.ai</span></div>
             <div class="section-title" style="font-size:0.95rem">Convert Each Image → 5s Video</div>
           </div>
           <div class="status-badge status-idle" id="i2v-status"><div class="status-dot"></div>Idle</div>
         </div>
         <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:0.9rem;margin-bottom:1rem">
           <div style="font-size:0.78rem;font-weight:700;color:var(--accent2);margin-bottom:5px">How it works</div>
-          <div style="font-size:0.75rem;color:var(--text2);line-height:1.7">Each uploaded image is sent to <strong style="color:var(--text)">Kling v1 Standard</strong> (hosted on FAL.ai) which generates a <strong style="color:var(--text)">5-second cinematic video clip</strong> per image. Faster and lower cost than Pro — same FAL.ai key.</div>
+          <div style="font-size:0.75rem;color:var(--text2);line-height:1.7">Each uploaded image is sent to <strong style="color:var(--text)">LTX Video</strong> (hosted on FAL.ai) which generates a <strong style="color:var(--text)">~5-second video clip</strong> per image in <strong style="color:var(--green)">~20–40 seconds</strong> — the fastest model on FAL.ai, same key.</div>
           <div style="margin-top:6px;font-size:0.73rem;color:var(--text3)">Get a free key: fal.ai → Sign up → Dashboard → API Keys</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
@@ -2160,14 +2160,35 @@ async function falJson(res) {
   catch(e) { throw new Error(`FAL.ai returned non-JSON (${res.status}): ${text.substring(0, 120)}`); }
 }
 
-async function callFalWan(imageDataURL, prompt, stBadge) {
-  const BASE = 'https://queue.fal.run/fal-ai/kling-video/v1/standard/image-to-video';
+function resizeToLTX(dataURL) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const W = 768, H = 512;
+      const canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      const scale = Math.max(W / img.width, H / img.height);
+      const sw = img.width * scale, sh = img.height * scale;
+      ctx.drawImage(img, (W - sw) / 2, (H - sh) / 2, sw, sh);
+      resolve(canvas.toDataURL('image/jpeg', 0.92));
+    };
+    img.src = dataURL;
+  });
+}
 
-  // Upload image to FAL.ai storage first — avoids sending MB-sized base64 in the POST body
-  setI2VBadge(stBadge, 'running', 'Uploading image...');
-  let imageUrl = imageDataURL;
+async function callFalWan(imageDataURL, prompt, stBadge) {
+  const BASE = 'https://queue.fal.run/fal-ai/ltx-video/image-to-video';
+
+  // Resize to 768×512 required by LTX Video
+  setI2VBadge(stBadge, 'running', 'Resizing...');
+  const resized = await resizeToLTX(imageDataURL);
+
+  // Upload to FAL.ai storage — avoids sending MB-sized base64 in the POST body
+  setI2VBadge(stBadge, 'running', 'Uploading...');
+  let imageUrl = resized;
   try {
-    const imgBlob = await fetch(imageDataURL).then(r => r.blob());
+    const imgBlob = await fetch(resized).then(r => r.blob());
     const form = new FormData();
     form.append('file', imgBlob, 'image.jpg');
     const upRes = await fetch('https://storage.fal.run/', {
@@ -2186,7 +2207,7 @@ async function callFalWan(imageDataURL, prompt, stBadge) {
   const sub = await fetch(BASE, {
     method: 'POST',
     headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image_url: imageUrl, prompt, duration: 5, negative_prompt: 'blur, distort, low quality' })
+    body: JSON.stringify({ image_url: imageUrl, prompt, num_inference_steps: 30, guidance_scale: 3, negative_prompt: 'blur, distort, low quality, worst quality' })
   });
   const subData = await falJson(sub);
   if (!sub.ok) throw new Error(`FAL.ai submit failed (${sub.status}): ${JSON.stringify(subData).substring(0, 120)}`);
