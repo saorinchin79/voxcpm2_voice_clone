@@ -12,6 +12,8 @@ class SecureHandler(SimpleHTTPRequestHandler):
         pass  # silent logging
 
 if __name__ == '__main__':
-    server = HTTPServer(('', 8080), SecureHandler)
-    print('Studio running at http://localhost:8080/studio.html')
+    import os
+    port = int(os.environ.get('PORT', 8080))
+    server = HTTPServer(('', port), SecureHandler)
+    print(f'Studio running at http://localhost:{port}/studio.html')
     server.serve_forever()
