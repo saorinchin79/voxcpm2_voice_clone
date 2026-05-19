@@ -2153,37 +2153,66 @@ async function batchImageToVideo() {
   renderGrid();
 }
 
-async function callFalWan(imageDataURL, prompt, stBadge) {
-  const BASE = 'https://queue.fal.run/fal-ai/wan/i2v/480p';
-  setI2VBadge(stBadge, 'running', 'Queueing...');
+async function falJson(res) {
+  const text = await res.text();
+  if (!text.trim()) throw new Error(`Empty response from FAL.ai (HTTP ${res.status})`);
+  try { return JSON.parse(text); }
+  catch(e) { throw new Error(`FAL.ai returned non-JSON (${res.status}): ${text.substring(0, 120)}`); }
+}
 
+async function callFalWan(imageDataURL, prompt, stBadge) {
+  const BASE = 'https://queue.fal.run/fal-ai/wan/image-to-video';
+
+  // Upload image to FAL.ai storage first — avoids sending MB-sized base64 in the POST body
+  setI2VBadge(stBadge, 'running', 'Uploading image...');
+  let imageUrl = imageDataURL;
+  try {
+    const imgBlob = await fetch(imageDataURL).then(r => r.blob());
+    const form = new FormData();
+    form.append('file', imgBlob, 'image.jpg');
+    const upRes = await fetch('https://storage.fal.run/', {
+      method: 'POST',
+      headers: { 'Authorization': `Key ${falKey}` },
+      body: form
+    });
+    const upData = await falJson(upRes);
+    if (upData.url) imageUrl = upData.url;
+  } catch(e) {
+    console.warn('FAL.ai storage upload failed, falling back to base64:', e.message);
+  }
+
+  // Submit inference job
+  setI2VBadge(stBadge, 'running', 'Queueing...');
   const sub = await fetch(BASE, {
     method: 'POST',
     headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image_url: imageDataURL, prompt, num_frames: 81, fps: 16, guidance_scale: 5.0 })
+    body: JSON.stringify({ image_url: imageUrl, prompt, num_frames: 81, fps: 16 })
   });
-  if (!sub.ok) {
-    const txt = await sub.text();
-    throw new Error(`FAL.ai ${sub.status}: ${txt.substring(0, 120)}`);
-  }
-  const { request_id } = await sub.json();
+  const subData = await falJson(sub);
+  if (!sub.ok) throw new Error(`FAL.ai submit failed (${sub.status}): ${JSON.stringify(subData).substring(0, 120)}`);
+  const { request_id } = subData;
+  if (!request_id) throw new Error('FAL.ai did not return a request_id: ' + JSON.stringify(subData).substring(0, 120));
 
+  // Poll for completion
   let polls = 0;
   while (polls++ < 200) {
     await new Promise(r => setTimeout(r, 3000));
     setI2VBadge(stBadge, 'running', `⏳ ${Math.round(polls * 3)}s...`);
-    const sr = await fetch(`${BASE}/requests/${request_id}/status`, {
-      headers: { 'Authorization': `Key ${falKey}` }
-    });
-    const sd = await sr.json();
-    if (sd.status === 'COMPLETED') {
-      const rr = await fetch(`${BASE}/requests/${request_id}`, { headers: { 'Authorization': `Key ${falKey}` } });
-      const rd = await rr.json();
-      const url = rd.video?.url || rd.output?.video?.url;
-      if (!url) throw new Error('No video URL in FAL.ai response');
-      return url;
+    try {
+      const sr = await fetch(`${BASE}/requests/${request_id}/status`, { headers: { 'Authorization': `Key ${falKey}` } });
+      const sd = await falJson(sr);
+      if (sd.status === 'COMPLETED') {
+        const rr = await fetch(`${BASE}/requests/${request_id}`, { headers: { 'Authorization': `Key ${falKey}` } });
+        const rd = await falJson(rr);
+        const url = rd.video?.url || rd.output?.video?.url || rd.outputs?.[0]?.url;
+        if (!url) throw new Error('No video URL in FAL.ai result: ' + JSON.stringify(rd).substring(0, 200));
+        return url;
+      }
+      if (sd.status === 'FAILED') throw new Error('FAL.ai generation failed: ' + (sd.error || JSON.stringify(sd)));
+    } catch(pollErr) {
+      if (pollErr.message.includes('FAL.ai generation failed')) throw pollErr;
+      console.warn('FAL.ai poll error (retrying):', pollErr.message);
     }
-    if (sd.status === 'FAILED') throw new Error('FAL.ai generation failed: ' + (sd.error || 'unknown'));
   }
   throw new Error('FAL.ai timeout after 10 minutes');
 }
