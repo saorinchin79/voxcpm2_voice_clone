@@ -7,6 +7,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Suwannaphum:wght@100;300;400;700;900&display=swap" rel="stylesheet">
 <style>
+  @font-face {
+    font-family: 'KhAngHandTChhim';
+    src: url('assets/KhAngHandTChhim.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+  }
+
   :root {
     --bg: #0a0a0f;
     --bg2: #111118;
@@ -197,6 +204,12 @@
   .img-thumb[draggable=true]:active { cursor: grabbing; }
   .img-thumb.drag-target { border: 2px solid var(--accent) !important; transform: scale(1.05); box-shadow: 0 0 16px rgba(124,110,247,0.4); transition: transform 0.15s; }
 
+  /* LOGO POSITION GRID */
+  .logo-pos-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 8px; }
+  .logo-pos-btn { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 9px 4px; text-align: center; cursor: pointer; font-size: 0.7rem; font-weight: 700; transition: all 0.2s; color: var(--text2); user-select: none; }
+  .logo-pos-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(124,110,247,0.06); }
+  .logo-pos-btn.selected { background: rgba(124,110,247,0.15); border-color: var(--accent); color: var(--accent2); }
+
 </style>
 </head>
 <body>
@@ -235,6 +248,17 @@
           <div class="upload-icon">🖼 🎬</div>
           <div class="upload-title">Drop images or videos here</div>
           <div class="upload-sub">Images: PNG JPG WEBP · Videos: MP4 MOV WEBM · Images auto-enhanced ✨</div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:1rem;padding:10px 14px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border)">
+          <div class="toggle-wrap">
+            <div class="toggle on" id="autocrop-toggle" onclick="this.classList.toggle('on');saveSettings()"></div>
+            <div>
+              <div class="toggle-label" style="font-weight:700;color:var(--text)">Auto Crop to Output Resolution</div>
+              <div style="font-size:0.72rem;color:var(--text3);margin-top:2px">Center-crops each image to match the selected aspect ratio — no black bars</div>
+            </div>
+          </div>
+          <button class="btn btn-outline" style="font-size:0.75rem;padding:6px 14px;flex-shrink:0" onclick="reCropAll()" id="recrop-btn" title="Re-crop all uploaded images to current resolution">✂ Re-crop All</button>
         </div>
 
         <div class="image-grid" id="image-grid"></div>
@@ -338,6 +362,124 @@
         </div>
       </div>
 
+      <!-- LOGO ANIMATION OVERLAY -->
+      <div class="card fade-in" style="animation-delay:0.15s">
+        <div class="section-header">
+          <div>
+            <div class="card-title">Logo Animation <span style="color:var(--text3);font-weight:400">(optional)</span></div>
+            <div class="section-title" style="font-size:0.95rem">Animated PNG Logo on Video</div>
+          </div>
+          <div class="toggle-wrap">
+            <div class="toggle" id="logo-toggle" onclick="toggleLogoOverlay(this)"></div>
+            <span class="toggle-label">Enable logo</span>
+          </div>
+        </div>
+
+        <div id="logo-options" style="display:none">
+          <label class="file-upload-btn" for="logo-input" style="justify-content:center;margin-bottom:10px">
+            🏷 Upload Logo PNG
+          </label>
+          <input type="file" id="logo-input" accept="image/png" onchange="loadLogoOverlay(this)">
+          <div class="help" style="margin-bottom:1rem">Transparent background PNG recommended</div>
+
+          <div id="logo-preview-wrap" style="display:none;margin-bottom:1.2rem">
+            <div style="display:flex;gap:1rem;align-items:center">
+              <div style="background:repeating-conic-gradient(#1a1a24 0% 25%,#111118 0% 50%) 0 0/12px 12px;border:1px solid var(--border);border-radius:var(--radius);padding:10px;flex-shrink:0">
+                <img id="logo-preview-img" style="max-width:100px;max-height:56px;display:block;object-fit:contain">
+              </div>
+              <div>
+                <div style="font-size:0.8rem;color:var(--text);font-weight:700" id="logo-info"></div>
+                <button class="btn btn-outline" style="font-size:0.72rem;padding:4px 10px;margin-top:8px" onclick="removeLogo()">✕ Remove</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="input-wrap">
+            <label class="input-label">Position on Video</label>
+            <div class="logo-pos-grid">
+              <div class="logo-pos-btn" data-pos="top-left"      onclick="selectLogoPos(this)">↖ Top Left</div>
+              <div class="logo-pos-btn" data-pos="top-center"    onclick="selectLogoPos(this)">⬆ Top Center</div>
+              <div class="logo-pos-btn selected" data-pos="top-right"   onclick="selectLogoPos(this)">↗ Top Right</div>
+              <div class="logo-pos-btn" data-pos="bottom-left"   onclick="selectLogoPos(this)">↙ Bottom Left</div>
+              <div class="logo-pos-btn" data-pos="bottom-center" onclick="selectLogoPos(this)">⬇ Bottom Center</div>
+              <div class="logo-pos-btn" data-pos="bottom-right"  onclick="selectLogoPos(this)">↘ Bottom Right</div>
+            </div>
+          </div>
+
+          <div class="input-wrap">
+            <label class="input-label">Animation Style</label>
+            <select id="logo-anim-select" style="width:100%">
+              <option value="none">— Static (no animation) —</option>
+              <optgroup label="Attention Seekers (loop)">
+                <option value="bounce">Bounce</option>
+                <option value="flash">Flash</option>
+                <option value="pulse">Pulse</option>
+                <option value="rubberBand">Rubber Band</option>
+                <option value="shakeX">Shake X</option>
+                <option value="swing">Swing</option>
+                <option value="tada">Tada</option>
+                <option value="wobble">Wobble</option>
+              </optgroup>
+              <optgroup label="Back Entrances (play once)">
+                <option value="backInDown">Back In Down</option>
+                <option value="backInLeft">Back In Left</option>
+                <option value="backInRight">Back In Right</option>
+                <option value="backInUp">Back In Up</option>
+              </optgroup>
+              <optgroup label="Fading Entrances (play once)">
+                <option value="fadeIn">Fade In</option>
+                <option value="fadeInDown">Fade In Down</option>
+                <option value="fadeInLeft">Fade In Left</option>
+                <option value="fadeInRight">Fade In Right</option>
+                <option value="fadeInUp">Fade In Up</option>
+              </optgroup>
+              <optgroup label="Flippers">
+                <option value="flip">Flip (loop)</option>
+                <option value="flipInX">Flip In X (once)</option>
+                <option value="flipInY">Flip In Y (once)</option>
+                <option value="flipOutX">Flip Out X → static</option>
+              </optgroup>
+              <optgroup label="Zoom Entrances (play once)">
+                <option value="zoomIn">Zoom In</option>
+                <option value="zoomInDown">Zoom In Down</option>
+                <option value="zoomInLeft">Zoom In Left</option>
+              </optgroup>
+              <optgroup label="W3.CSS Style">
+                <option value="w3-animate-top">W3 Slide from Top</option>
+                <option value="w3-animate-bottom">W3 Slide from Bottom</option>
+                <option value="w3-animate-left">W3 Slide from Left</option>
+                <option value="w3-animate-right">W3 Slide from Right</option>
+                <option value="w3-animate-opacity">W3 Opacity Fade In</option>
+                <option value="w3-animate-zoom">W3 Zoom In</option>
+                <option value="w3-spin">W3 Spin 360° (loop)</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <div class="setting-row">
+            <div><div class="setting-label">Logo Size</div><div class="setting-sub">% of video width</div></div>
+            <div class="slider-wrap" style="width:160px">
+              <input type="range" min="5" max="40" value="15" id="logo-size" oninput="document.getElementById('logo-size-val').textContent=this.value+'%'">
+              <span class="slider-val" id="logo-size-val">15%</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Animation Speed</div><div class="setting-sub">Cycle / entrance duration</div></div>
+            <div class="slider-wrap" style="width:160px">
+              <input type="range" min="0.3" max="3" step="0.1" value="1" id="logo-anim-speed" oninput="document.getElementById('logo-speed-val').textContent=parseFloat(this.value).toFixed(1)+'s'">
+              <span class="slider-val" id="logo-speed-val">1.0s</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Logo Opacity</div><div class="setting-sub">Transparency of logo overlay</div></div>
+            <div class="slider-wrap" style="width:160px">
+              <input type="range" min="10" max="100" value="90" id="logo-opacity" oninput="document.getElementById('logo-opacity-val').textContent=this.value+'%'">
+              <span class="slider-val" id="logo-opacity-val">90%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- STEP 3 — PNG FRAME OVERLAY -->
       <div class="card fade-in" style="animation-delay:0.2s">
         <div class="section-header">
@@ -376,6 +518,151 @@
             <div style="display:flex;gap:6px;margin-top:8px;align-items:center">
               <span style="font-size:0.72rem;color:var(--text3);font-family:var(--mono)" id="frame-info"></span>
               <button class="btn btn-outline" style="font-size:0.72rem;padding:4px 10px;margin-left:auto" onclick="removeFrame()">✕ Remove</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4 — VIGNETTING FILTER -->
+      <div class="card fade-in" style="animation-delay:0.25s">
+        <div class="section-header">
+          <div>
+            <div class="card-title">Step 4 — Vignetting Filter <span style="color:var(--text3);font-weight:400">(optional)</span></div>
+            <div class="section-title" style="font-size:0.95rem">Dark Edge Focus Effect</div>
+          </div>
+          <div class="toggle-wrap">
+            <div class="toggle" id="vignette-toggle" onclick="vignetteEnabled=!vignetteEnabled;this.classList.toggle('on');document.getElementById('vignette-opts').style.display=vignetteEnabled?'block':'none';saveSettings()"></div>
+            <span class="toggle-label">Enable vignette</span>
+          </div>
+        </div>
+        <div id="vignette-opts" style="display:none">
+          <div class="setting-row">
+            <div><div class="setting-label">Intensity</div><div class="setting-sub">Darkness at the edges</div></div>
+            <div class="slider-wrap" style="width:160px">
+              <input type="range" min="10" max="100" value="60" id="vignette-intensity" oninput="document.getElementById('vig-int-val').textContent=this.value+'%'">
+              <span class="slider-val" id="vig-int-val">60%</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Spread</div><div class="setting-sub">Clear center radius</div></div>
+            <div class="slider-wrap" style="width:160px">
+              <input type="range" min="10" max="90" value="50" id="vignette-spread" oninput="document.getElementById('vig-sp-val').textContent=this.value+'%'">
+              <span class="slider-val" id="vig-sp-val">50%</span>
+            </div>
+          </div>
+          <div style="margin-top:1rem;height:40px;border-radius:var(--radius);background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,0.8) 100%);border:1px solid var(--border)"></div>
+          <div style="font-size:0.7rem;color:var(--text3);text-align:center;margin-top:6px">Preview (adjust sliders to see changes on generated video)</div>
+        </div>
+      </div>
+
+      <!-- STEP 5 — TEXT TITLE TOOL -->
+      <div class="card fade-in" style="animation-delay:0.3s">
+        <div class="section-header">
+          <div>
+            <div class="card-title">Step 5 — Text Title Tool <span style="color:var(--text3);font-weight:400">(optional)</span></div>
+            <div class="section-title" style="font-size:0.95rem">Add Text on Video</div>
+          </div>
+          <div class="toggle-wrap">
+            <div class="toggle" id="text-toggle" onclick="toggleTextOverlay(this)"></div>
+            <span class="toggle-label">Enable text</span>
+          </div>
+        </div>
+        <div id="text-opts" style="display:none">
+
+          <div class="input-wrap">
+            <label class="input-label">Text Content</label>
+            <textarea id="text-content" rows="2" placeholder="Enter your title text..."></textarea>
+            <div class="help">New line = new text line</div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+            <div>
+              <label class="input-label">Font Family</label>
+              <select id="text-family" style="width:100%;margin-top:4px">
+                <option value="'KhAngHandTChhim', sans-serif">Kh Ang Hand (T.Chhim)</option>
+                <option value="'Suwannaphum', sans-serif">Suwannaphum (Google)</option>
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="'Georgia', serif">Georgia</option>
+                <option value="'Times New Roman', serif">Times New Roman</option>
+                <option value="Impact, sans-serif">Impact</option>
+                <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                <option value="Verdana, sans-serif">Verdana</option>
+                <option value="'Courier New', monospace">Courier New</option>
+              </select>
+            </div>
+            <div>
+              <label class="input-label">Text Color</label>
+              <div style="display:flex;gap:10px;align-items:center;margin-top:6px">
+                <input type="color" id="text-color" value="#ffffff" style="width:38px;height:34px;border:1px solid var(--border2);border-radius:8px;cursor:pointer;padding:2px;background:none">
+                <div class="toggle-wrap">
+                  <div class="toggle on" id="text-bold-toggle" onclick="this.classList.toggle('on');saveSettings()"></div>
+                  <span class="toggle-label" style="font-size:0.8rem">Bold</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div><div class="setting-label">Font Size</div><div class="setting-sub">% of video width</div></div>
+            <div class="slider-wrap" style="width:160px">
+              <input type="range" min="1" max="12" value="4" step="0.5" id="text-size" oninput="document.getElementById('text-size-val').textContent=parseFloat(this.value).toFixed(1)+'%'">
+              <span class="slider-val" id="text-size-val">4.0%</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Opacity</div><div class="setting-sub">Text transparency</div></div>
+            <div class="slider-wrap" style="width:160px">
+              <input type="range" min="10" max="100" value="100" id="text-opacity" oninput="document.getElementById('text-op-val').textContent=this.value+'%'">
+              <span class="slider-val" id="text-op-val">100%</span>
+            </div>
+          </div>
+
+          <div class="input-wrap" style="margin-top:0.75rem">
+            <label class="input-label">Text Position</label>
+            <div class="logo-pos-grid" id="text-pos-grid">
+              <div class="logo-pos-btn" data-pos="top-left"      onclick="selectTextPos(this)">↖ Top Left</div>
+              <div class="logo-pos-btn" data-pos="top-center"    onclick="selectTextPos(this)">⬆ Top Center</div>
+              <div class="logo-pos-btn" data-pos="top-right"     onclick="selectTextPos(this)">↗ Top Right</div>
+              <div class="logo-pos-btn" data-pos="bottom-left"   onclick="selectTextPos(this)">↙ Bottom Left</div>
+              <div class="logo-pos-btn selected" data-pos="bottom-center" onclick="selectTextPos(this)">⬇ Bottom Center</div>
+              <div class="logo-pos-btn" data-pos="bottom-right"  onclick="selectTextPos(this)">↘ Bottom Right</div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+            <div class="card-title" style="margin-bottom:0">Drop Shadow</div>
+            <div class="toggle-wrap">
+              <div class="toggle on" id="text-shadow-toggle" onclick="this.classList.toggle('on');document.getElementById('text-shadow-opts').style.display=this.classList.contains('on')?'grid':'none'"></div>
+              <span class="toggle-label">Enable</span>
+            </div>
+          </div>
+          <div id="text-shadow-opts" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div>
+              <label class="input-label">Shadow Color</label>
+              <input type="color" id="text-shadow-color" value="#000000" style="width:100%;height:34px;border:1px solid var(--border2);border-radius:8px;cursor:pointer;padding:2px;background:none;margin-top:4px">
+            </div>
+            <div>
+              <label class="input-label">Blur Radius</label>
+              <div class="slider-wrap" style="margin-top:6px">
+                <input type="range" min="0" max="40" value="8" id="text-shadow-blur" oninput="document.getElementById('sh-blur-val').textContent=this.value+'px'">
+                <span class="slider-val" id="sh-blur-val">8px</span>
+              </div>
+            </div>
+            <div>
+              <label class="input-label">Offset X</label>
+              <div class="slider-wrap" style="margin-top:6px">
+                <input type="range" min="-20" max="20" value="2" id="text-shadow-ox" oninput="document.getElementById('sh-ox-val').textContent=(this.value>0?'+':'')+this.value+'px'">
+                <span class="slider-val" id="sh-ox-val">+2px</span>
+              </div>
+            </div>
+            <div>
+              <label class="input-label">Offset Y</label>
+              <div class="slider-wrap" style="margin-top:6px">
+                <input type="range" min="-20" max="20" value="2" id="text-shadow-oy" oninput="document.getElementById('sh-oy-val').textContent=(this.value>0?'+':'')+this.value+'px'">
+                <span class="slider-val" id="sh-oy-val">+2px</span>
+              </div>
             </div>
           </div>
         </div>
@@ -758,8 +1045,15 @@
 <script>
 const API = '';
 let mediaItems = [], videoBlob = null, selectedFX = 'tectonic', finalBlob = null, generatedVideoURL = null, combinedAudioBlob = null;
-let frameOverlayImg = null; // PNG frame overlay image element
-let generatedSegments = []; // [{text, url, blob}]
+let frameOverlayImg   = null;
+let logoOverlayImg    = null;
+let logoEnabled       = false;
+let logoPosition      = 'top-right';
+let logoRenderElapsed = 0;
+let vignetteEnabled   = false;
+let textEnabled       = false;
+let textPosition      = 'bottom-center';
+let generatedSegments = [];
 
 // ─── PAGE NAVIGATION ────────────────────────────────────────────────────────
 function showPage(name) {
@@ -778,6 +1072,7 @@ function selectFX(el) {
   el.classList.add('selected');
   selectedFX = el.dataset.fx;
   document.getElementById('fx-mode').value = selectedFX;
+  saveSettings();
 }
 
 // ─── MEDIA UPLOAD (IMAGE + VIDEO) ────────────────────────────────────────────
@@ -788,18 +1083,67 @@ zone.addEventListener('dragleave', ()  => zone.classList.remove('drag-over'));
 zone.addEventListener('drop',      e  => { e.preventDefault(); zone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
 fi.addEventListener('change', e => handleFiles(e.target.files));
 
+// ─── AUTO CROP ────────────────────────────────────────────────────────────────
+function getOutputDimensions() {
+  const sel = (document.getElementById('resolution') || {}).value || '1920x1080';
+  const [W, H] = sel.split('x').map(Number);
+  return { W, H };
+}
+
+async function autoCropImage(dataURL) {
+  const { W, H } = getOutputDimensions();
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const imgW = img.naturalWidth, imgH = img.naturalHeight;
+      const targetRatio = W / H, imgRatio = imgW / imgH;
+      let cropW, cropH, cropX, cropY;
+      if (imgRatio > targetRatio) {
+        cropH = imgH; cropW = imgH * targetRatio;
+        cropX = (imgW - cropW) / 2; cropY = 0;
+      } else {
+        cropW = imgW; cropH = imgW / targetRatio;
+        cropX = 0; cropY = (imgH - cropH) / 2;
+      }
+      const canvas = document.createElement('canvas');
+      const outW = Math.min(imgW, W), outH = Math.round(outW / targetRatio);
+      canvas.width = outW; canvas.height = outH;
+      canvas.getContext('2d').drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outW, outH);
+      resolve(canvas.toDataURL('image/jpeg', 0.95));
+    };
+    img.src = dataURL;
+  });
+}
+
+async function reCropAll() {
+  const btn = document.getElementById('recrop-btn');
+  btn.disabled = true; btn.textContent = '⏳ Cropping...';
+  for (let i = 0; i < mediaItems.length; i++) {
+    if (mediaItems[i].type !== 'image' || !mediaItems[i].src) continue;
+    mediaItems[i].enhanced = false;
+    const cropped = await autoCropImage(mediaItems[i].src);
+    if (mediaItems[i]) { mediaItems[i].src = cropped; mediaItems[i].enhanced = false; }
+    renderGrid();
+    enhanceImage(cropped, i);
+  }
+  btn.disabled = false; btn.textContent = '✂ Re-crop All';
+}
+
 function handleFiles(files) {
   Array.from(files).forEach(f => {
     if (f.type.startsWith('image/')) {
       const idx = mediaItems.length;
       mediaItems.push({type:'image', src:'', name:f.name, blob:f, enhanced:false, duration:0});
       renderGrid();
-      // Load raw first, then enhance
       const reader = new FileReader();
-      reader.onload = ev => {
-        mediaItems[idx].src = ev.target.result;
+      reader.onload = async ev => {
+        const autoCropOn = document.getElementById('autocrop-toggle').classList.contains('on');
+        const raw = ev.target.result;
+        const src = autoCropOn ? await autoCropImage(raw) : raw;
+        if (!mediaItems[idx]) return;
+        mediaItems[idx].src = src;
         renderGrid();
-        enhanceImage(ev.target.result, idx);
+        enhanceImage(src, idx);
       };
       reader.readAsDataURL(f);
     } else if (f.type.startsWith('video/')) {
@@ -849,6 +1193,7 @@ function saveEnhanceSettings() {
   const st = document.getElementById('enhance-settings-status');
   st.textContent = replicateKey ? '✅ Saved — AI enhance active' : '⚠ No key — using canvas fallback';
   st.style.color = replicateKey ? 'var(--green)' : 'var(--gold)';
+  saveSettings();
 }
 
 function toggleKeyVis() {
@@ -1138,6 +1483,271 @@ function removeFrame() {
   document.getElementById('frame-status').innerHTML = '<div class="status-dot"></div>No frame';
 }
 
+// ─── LOGO ANIMATION OVERLAY ───────────────────────────────────────────────────
+function toggleLogoOverlay(el) {
+  el.classList.toggle('on');
+  logoEnabled = el.classList.contains('on');
+  document.getElementById('logo-options').style.display = logoEnabled ? 'block' : 'none';
+  saveSettings();
+}
+
+function loadLogoOverlay(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.type !== 'image/png') { alert('Please upload a PNG file.'); input.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      logoOverlayImg = img;
+      document.getElementById('logo-preview-img').src = ev.target.result;
+      document.getElementById('logo-preview-wrap').style.display = 'block';
+      document.getElementById('logo-info').textContent = `${img.naturalWidth} × ${img.naturalHeight} px`;
+      saveSettings();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeLogo() {
+  logoOverlayImg = null;
+  localStorage.removeItem(LOGO_KEY);
+  document.getElementById('logo-input').value = '';
+  document.getElementById('logo-preview-wrap').style.display = 'none';
+  saveSettings();
+}
+
+function selectLogoPos(el) {
+  document.querySelectorAll('.logo-pos-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  logoPosition = el.dataset.pos;
+  saveSettings();
+}
+
+function drawLogo(ctx, W, H) {
+  if (!logoEnabled || !logoOverlayImg) return;
+
+  const elapsed  = logoRenderElapsed;
+  const sizePct  = parseInt(document.getElementById('logo-size').value) / 100;
+  const baseOp   = parseInt(document.getElementById('logo-opacity').value) / 100;
+  const dur      = parseFloat(document.getElementById('logo-anim-speed').value) || 1;
+  const anim     = document.getElementById('logo-anim-select').value;
+
+  const logoW  = Math.round(W * sizePct);
+  const logoH  = Math.round(logoW * (logoOverlayImg.naturalHeight / logoOverlayImg.naturalWidth));
+  const margin = Math.round(W * 0.025);
+
+  let bx, by;
+  switch (logoPosition) {
+    case 'top-left':      bx = margin;             by = margin;             break;
+    case 'top-center':    bx = (W - logoW) / 2;    by = margin;             break;
+    case 'top-right':     bx = W - logoW - margin;  by = margin;             break;
+    case 'bottom-left':   bx = margin;             by = H - logoH - margin; break;
+    case 'bottom-center': bx = (W - logoW) / 2;    by = H - logoH - margin; break;
+    case 'bottom-right':  bx = W - logoW - margin;  by = H - logoH - margin; break;
+    default:              bx = W - logoW - margin;  by = margin;
+  }
+  const cx = bx + logoW / 2;
+  const cy = by + logoH / 2;
+
+  const t      = (elapsed % dur) / dur;
+  const tOnce  = Math.min(1, elapsed / dur);
+  const ease   = v => v < 0.5 ? 2 * v * v : -1 + (4 - 2 * v) * v;
+  const ep     = ease(t);
+  const epOnce = ease(tOnce);
+
+  let alpha = baseOp, sx = 1, sy = 1, tx = 0, ty = 0, rot = 0;
+
+  switch (anim) {
+    // ── Attention Seekers (looping) ───────────────────────────────────────────
+    case 'bounce':
+      ty = -logoH * 0.35 * Math.abs(Math.sin(t * Math.PI * 2)); break;
+    case 'flash':
+      { const phase = (t * 5) % 1; alpha = phase < 0.5 ? baseOp : 0; } break;
+    case 'pulse':
+      { const ps = 1 + 0.18 * Math.sin(t * Math.PI * 2); sx = sy = ps; } break;
+    case 'rubberBand':
+      sx = 1 + 0.35 * Math.sin(t * Math.PI * 4);
+      sy = 1 - 0.25 * Math.sin(t * Math.PI * 4); break;
+    case 'shakeX':
+      tx = logoW * 0.12 * Math.sin(t * Math.PI * 8); break;
+    case 'swing':
+      rot = 20 * Math.sin(t * Math.PI * 2) * (Math.PI / 180); break;
+    case 'tada':
+      sx = sy = 1 + 0.12 * Math.sin(t * Math.PI * 6);
+      rot = 8 * Math.sin(t * Math.PI * 6) * (Math.PI / 180); break;
+    case 'wobble':
+      tx  = logoW * 0.18 * Math.sin(t * Math.PI * 4);
+      rot = 8 * Math.sin(t * Math.PI * 4) * (Math.PI / 180); break;
+    // ── Back Entrances (play once then static) ────────────────────────────────
+    case 'backInDown':
+      ty = -H * 0.4 * (1 - epOnce); sx = sy = 0.7 + 0.3 * epOnce;
+      alpha = baseOp * (tOnce < 0.3 ? tOnce / 0.3 : 1); break;
+    case 'backInLeft':
+      tx = -W * 0.5 * (1 - epOnce); sx = sy = 0.7 + 0.3 * epOnce;
+      alpha = baseOp * (tOnce < 0.3 ? tOnce / 0.3 : 1); break;
+    case 'backInRight':
+      tx =  W * 0.5 * (1 - epOnce); sx = sy = 0.7 + 0.3 * epOnce;
+      alpha = baseOp * (tOnce < 0.3 ? tOnce / 0.3 : 1); break;
+    case 'backInUp':
+      ty =  H * 0.4 * (1 - epOnce); sx = sy = 0.7 + 0.3 * epOnce;
+      alpha = baseOp * (tOnce < 0.3 ? tOnce / 0.3 : 1); break;
+    // ── Fading Entrances (play once) ─────────────────────────────────────────
+    case 'fadeIn':
+      alpha = baseOp * epOnce; break;
+    case 'fadeInDown':
+      alpha = baseOp * epOnce; ty = -logoH * 0.8 * (1 - epOnce); break;
+    case 'fadeInLeft':
+      alpha = baseOp * epOnce; tx = -logoW * 0.8 * (1 - epOnce); break;
+    case 'fadeInRight':
+      alpha = baseOp * epOnce; tx =  logoW * 0.8 * (1 - epOnce); break;
+    case 'fadeInUp':
+      alpha = baseOp * epOnce; ty =  logoH * 0.8 * (1 - epOnce); break;
+    // ── Flippers ─────────────────────────────────────────────────────────────
+    case 'flip':
+      sx = Math.max(0.01, Math.abs(Math.cos(t * Math.PI * 2))); break;
+    case 'flipInX':
+      sy = epOnce; alpha = baseOp * tOnce; break;
+    case 'flipInY':
+      sx = epOnce; alpha = baseOp * tOnce; break;
+    case 'flipOutX':
+      sy = Math.max(0.01, 1 - epOnce * 0.5); alpha = baseOp * Math.max(0, 1 - tOnce * 0.5); break;
+    // ── Zoom Entrances (play once) ────────────────────────────────────────────
+    case 'zoomIn':
+      sx = sy = epOnce; alpha = baseOp * tOnce; break;
+    case 'zoomInDown':
+      sx = sy = epOnce; ty = -H * 0.25 * (1 - epOnce); alpha = baseOp * tOnce; break;
+    case 'zoomInLeft':
+      sx = sy = epOnce; tx = -W * 0.25 * (1 - epOnce); alpha = baseOp * tOnce; break;
+    // ── W3.CSS Style ─────────────────────────────────────────────────────────
+    case 'w3-animate-top':
+      ty = -logoH * (1 - epOnce); alpha = baseOp * epOnce; break;
+    case 'w3-animate-bottom':
+      ty =  logoH * (1 - epOnce); alpha = baseOp * epOnce; break;
+    case 'w3-animate-left':
+      tx = -logoW * (1 - epOnce); alpha = baseOp * epOnce; break;
+    case 'w3-animate-right':
+      tx =  logoW * (1 - epOnce); alpha = baseOp * epOnce; break;
+    case 'w3-animate-opacity':
+      alpha = baseOp * epOnce; break;
+    case 'w3-animate-zoom':
+      sx = sy = epOnce; alpha = baseOp * epOnce; break;
+    case 'w3-spin':
+      rot = t * Math.PI * 2; break;
+    default: break; // static
+  }
+
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+  ctx.translate(cx + tx, cy + ty);
+  ctx.rotate(rot);
+  ctx.scale(Math.max(0.001, sx), Math.max(0.001, sy));
+  ctx.drawImage(logoOverlayImg, -logoW / 2, -logoH / 2, logoW, logoH);
+  ctx.restore();
+}
+
+// ─── VIGNETTE FILTER ──────────────────────────────────────────────────────────
+function drawVignette(ctx, W, H) {
+  if (!vignetteEnabled) return;
+  const intensity = parseInt(document.getElementById('vignette-intensity').value) / 100;
+  const spread    = parseInt(document.getElementById('vignette-spread').value) / 100;
+  const cx = W / 2, cy = H / 2;
+  const outerR = Math.sqrt(cx * cx + cy * cy);
+  const innerR = outerR * spread;
+  const g = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, `rgba(0,0,0,${intensity})`);
+  ctx.save();
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+}
+
+// ─── TEXT TITLE TOOL ─────────────────────────────────────────────────────────
+function toggleTextOverlay(el) {
+  el.classList.toggle('on');
+  textEnabled = el.classList.contains('on');
+  document.getElementById('text-opts').style.display = textEnabled ? 'block' : 'none';
+  saveSettings();
+}
+
+function selectTextPos(el) {
+  document.querySelectorAll('#text-pos-grid .logo-pos-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  textPosition = el.dataset.pos;
+  saveSettings();
+}
+
+function drawTextOverlay(ctx, W, H) {
+  if (!textEnabled) return;
+  const content = (document.getElementById('text-content').value || '').trim();
+  if (!content) return;
+
+  const sizePct  = parseFloat(document.getElementById('text-size').value) / 100;
+  const family   = document.getElementById('text-family').value;
+  const bold     = document.getElementById('text-bold-toggle').classList.contains('on');
+  const color    = document.getElementById('text-color').value;
+  const opacity  = parseInt(document.getElementById('text-opacity').value) / 100;
+  const shadowOn = document.getElementById('text-shadow-toggle').classList.contains('on');
+  const sColor   = document.getElementById('text-shadow-color').value;
+  const sBlur    = parseInt(document.getElementById('text-shadow-blur').value);
+  const sOX      = parseInt(document.getElementById('text-shadow-ox').value);
+  const sOY      = parseInt(document.getElementById('text-shadow-oy').value);
+
+  const fontSize   = Math.round(W * sizePct);
+  const lineHeight = Math.round(fontSize * 1.35);
+  const maxWidth   = W * 0.86;
+  const margin     = Math.round(W * 0.05);
+
+  ctx.save();
+  ctx.font = `${bold ? 'bold' : 'normal'} ${fontSize}px ${family}`;
+
+  // Word-wrap with manual newline support
+  const lines = [];
+  for (const rawLine of content.split('\n')) {
+    if (!rawLine.trim()) { lines.push(''); continue; }
+    let line = '';
+    for (const word of rawLine.split(' ')) {
+      const test = line ? line + ' ' + word : word;
+      if (ctx.measureText(test).width > maxWidth && line) {
+        lines.push(line); line = word;
+      } else { line = test; }
+    }
+    if (line) lines.push(line);
+  }
+
+  const totalTextH = lineHeight * lines.length;
+
+  // Anchor x, y and alignment from textPosition
+  let x, y, align;
+  switch (textPosition) {
+    case 'top-left':      x = margin;     y = margin + fontSize / 2;               align = 'left';   break;
+    case 'top-center':    x = W / 2;      y = margin + fontSize / 2;               align = 'center'; break;
+    case 'top-right':     x = W - margin; y = margin + fontSize / 2;               align = 'right';  break;
+    case 'bottom-left':   x = margin;     y = H - margin - totalTextH + fontSize / 2; align = 'left';   break;
+    case 'bottom-right':  x = W - margin; y = H - margin - totalTextH + fontSize / 2; align = 'right';  break;
+    default:              x = W / 2;      y = H - margin - totalTextH + fontSize / 2; align = 'center';
+  }
+
+  ctx.globalAlpha  = opacity;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign    = align;
+  ctx.fillStyle    = color;
+
+  if (shadowOn) {
+    ctx.shadowColor   = sColor;
+    ctx.shadowBlur    = sBlur;
+    ctx.shadowOffsetX = sOX;
+    ctx.shadowOffsetY = sOY;
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], x, y + i * lineHeight, maxWidth);
+  }
+  ctx.restore();
+}
+
 // ─── VIDEO GENERATION (IMAGES + VIDEOS COMBINED) ─────────────────────────────
 async function generateVideo() {
   if (mediaItems.length < 1) return;
@@ -1146,6 +1756,7 @@ async function generateVideo() {
   document.getElementById('gen-progress').style.display = 'block';
   setGlobalStatus('running', 'Generating video...');
 
+  logoRenderElapsed = 0;
   const imgDur    = parseInt(document.getElementById('img-duration').value);
   const fxMode    = document.getElementById('fx-mode').value;
   const resSel    = document.getElementById('resolution').value.split('x');
@@ -1191,8 +1802,10 @@ async function generateVideo() {
     const r = Math.min(W/w, H/h);
     ctx.fillStyle = '#000'; ctx.fillRect(0,0,W,H);
     ctx.drawImage(el, (W-w*r)/2, (H-h*r)/2, w*r, h*r);
-    // Draw PNG frame overlay on top if loaded
+    drawVignette(ctx, W, H);
     if (frameOverlayImg) ctx.drawImage(frameOverlayImg, 0, 0, W, H);
+    drawTextOverlay(ctx, W, H);
+    drawLogo(ctx, W, H);
   }
 
   function drawTransition(elA, elB, p, fx) {
@@ -1233,8 +1846,10 @@ async function generateVideo() {
       ctx.save(); ctx.globalAlpha=ep; ctx.fillStyle=`rgba(255,${Math.round(120*(1-ep))},0,${ep*0.6})`; ctx.fillRect(0,0,W,H); ctx.restore();
       ctx.save(); ctx.globalAlpha=ep; drawCover(elB); ctx.restore();
     }
-    // Frame overlay on top of transition too
+    drawVignette(ctx, W, H);
     if (frameOverlayImg) ctx.drawImage(frameOverlayImg, 0, 0, W, H);
+    drawTextOverlay(ctx, W, H);
+    drawLogo(ctx, W, H);
   }
 
   // Estimate total render time for progress
@@ -1255,6 +1870,7 @@ async function generateVideo() {
       // Hold frames
       const holdFrames = Math.floor(FPS * imgDur);
       for (let f=0; f<holdFrames; f++) {
+        logoRenderElapsed = frameCount / FPS;
         drawCover(el); frameCount++;
         setProgress(Math.min(94, 20+74*(frameCount/totalFrames)), `Rendering image ${label}...`);
         await new Promise(r => setTimeout(r, 1000/FPS));
@@ -1268,6 +1884,7 @@ async function generateVideo() {
       await new Promise(resolve => {
         function vframe() {
           const elapsed = performance.now() - t0;
+          logoRenderElapsed = frameCount / FPS;
           drawCover(el); frameCount++;
           setProgress(Math.min(94, 20+74*(frameCount/totalFrames)), `Playing video ${label} · ${(elapsed/1000).toFixed(1)}s...`);
           if (elapsed < vidDur && !el.ended) {
@@ -1286,6 +1903,7 @@ async function generateVideo() {
         await new Promise(r => { next.onseeked = r; setTimeout(r, 300); });
       }
       for (let f=0; f<transFrames; f++) {
+        logoRenderElapsed = frameCount / FPS;
         drawTransition(el, next, f/transFrames, getFX());
         frameCount++; await new Promise(r => setTimeout(r, 1000/FPS));
       }
@@ -1751,22 +2369,34 @@ function resetVoice() {
 // ─── AUDIO CONCATENATION (Web Audio API) ─────────────────────────────────────
 async function concatAudioBlobs(blobs) {
   const audioCtx = new AudioContext();
-  const decoded  = await Promise.all(blobs.map(b => b.arrayBuffer().then(ab => audioCtx.decodeAudioData(ab))));
+
+  // Decode all segments in parallel, with per-segment error context
+  const decoded = await Promise.all(
+    blobs.map((b, i) =>
+      b.arrayBuffer()
+       .then(ab => audioCtx.decodeAudioData(ab))
+       .catch(e => { throw new Error(`Segment ${i + 1} decode failed: ${e.message}`); })
+    )
+  );
+
   const sr       = decoded[0].sampleRate;
   const ch       = decoded[0].numberOfChannels;
-  const totalLen = decoded.reduce((a,b) => a + b.length, 0);
+  const totalLen = decoded.reduce((a, b) => a + b.length, 0);
 
-  const offline = new OfflineAudioContext(ch, totalLen, sr);
+  // Direct Float32 copy — no OfflineAudioContext, no startRendering() wait.
+  // OfflineAudioContext.startRendering() runs at pseudo-realtime speed, so a
+  // 60-second audio would take ~60 seconds to process. Direct PCM copy is instant.
+  const merged = audioCtx.createBuffer(ch, totalLen, sr);
   let offset = 0;
   for (const buf of decoded) {
-    const src = offline.createBufferSource();
-    src.buffer = buf;
-    src.connect(offline.destination);
-    src.start(offline.currentTime + offset/sr);
+    for (let c = 0; c < ch; c++) {
+      merged.getChannelData(c).set(buf.getChannelData(c), offset);
+    }
     offset += buf.length;
   }
-  const rendered = await offline.startRendering();
-  return new Blob([audioBufferToWav(rendered)], {type:'audio/wav'});
+
+  await audioCtx.close();
+  return new Blob([audioBufferToWav(merged)], {type: 'audio/wav'});
 }
 
 function audioBufferToWav(buffer) {
@@ -1816,58 +2446,63 @@ async function combineAndDownload() {
     videoEl.muted = true;
     await new Promise(r => { videoEl.onloadedmetadata = r; videoEl.load(); });
 
-    // Get audio duration
-    const audioEl = new Audio(URL.createObjectURL(combinedAudio));
-    await new Promise(r => { audioEl.onloadedmetadata = r; audioEl.load(); });
-    const audioDur = audioEl.duration;
-    const videoDur = videoEl.duration;
-    // Audio is master length — video loops if shorter than audio
-    const totalDur = audioDur;
-    const needsLoop = videoDur < audioDur;
+    setCProg(48, 'Decoding audio...');
+    const audioCtx  = new AudioContext();
+    // Chrome's autoplay policy can suspend the context after async awaits — resume
+    // explicitly so AudioBufferSource never outputs silence due to suspension.
+    await audioCtx.resume();
+    audioCtx.onstatechange = () => { if (audioCtx.state === 'suspended') audioCtx.resume(); };
+    const audioData = await combinedAudio.arrayBuffer();
+    const audioBuf  = await audioCtx.decodeAudioData(audioData);
+    // audioBuf.duration is always exact — audioEl.duration on a WAV blob
+    // returns Infinity in Chrome until the full file is seeked, so we skip it.
+    const totalDur = audioBuf.duration;
+    const videoDur = isFinite(videoEl.duration) ? videoEl.duration : null;
+    // MediaRecorder WebM files embed no duration header, so videoEl.duration
+    // is typically Infinity/NaN. Always loop to be safe — if audio ends first
+    // the recording stops before the second loop completes anyway.
+    videoEl.loop = true;
+    videoEl.addEventListener('ended', () => {
+      videoEl.currentTime = 0;
+      videoEl.play().catch(() => {});
+    });
 
-    setCProg(50, 'Setting up canvas recorder...');
+    setCProg(52, 'Setting up canvas recorder...');
     const W = videoEl.videoWidth  || 1920;
     const H = videoEl.videoHeight || 1080;
     const FPS = 30;
     const canvas = document.createElement('canvas'); canvas.width=W; canvas.height=H;
     const ctx    = canvas.getContext('2d');
 
-    // Enable seamless looping on the video element
-    videoEl.loop = needsLoop;
-
-    // Decode audio into AudioContext for streaming
-    const audioCtx  = new AudioContext();
-    const audioData = await combinedAudio.arrayBuffer();
-    const audioBuf  = await audioCtx.decodeAudioData(audioData);
-    const src       = audioCtx.createBufferSource(); src.buffer = audioBuf;
-    const dest      = audioCtx.createMediaStreamDestination(); src.connect(dest);
+    const src  = audioCtx.createBufferSource(); src.buffer = audioBuf;
+    const dest = audioCtx.createMediaStreamDestination(); src.connect(dest);
 
     const videoStream = canvas.captureStream(FPS);
     const combined    = new MediaStream([...videoStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
     const avMime = typeof MediaRecorder.isTypeSupported === 'function'
       ? ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'].find(t => MediaRecorder.isTypeSupported(t))
       : undefined;
-    const rec         = new MediaRecorder(combined, Object.assign({videoBitsPerSecond:6000000}, avMime ? {mimeType: avMime} : {}));
-    const chunks      = [];
+    const rec    = new MediaRecorder(combined, Object.assign({videoBitsPerSecond:6000000}, avMime ? {mimeType: avMime} : {}));
+    const chunks = [];
     rec.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
 
-    const loopLabel = needsLoop
-      ? ` (video loops every ${videoDur.toFixed(1)}s)`
-      : '';
-    rec.start(200); src.start(0); videoEl.currentTime=0; videoEl.play();
-    setCProg(60, 'Recording combined video + audio' + loopLabel + '...');
+    const loopLabel = videoDur
+      ? (totalDur > videoDur ? ` (video loops ×${Math.ceil(totalDur/videoDur)})` : ' (video plays once)')
+      : ' (video loops)';
+    videoEl.currentTime = 0;
+    await videoEl.play();
+    rec.start(100); src.start(0);
+    setCProg(60, 'Recording video + audio' + loopLabel + '...');
 
     const t0 = performance.now();
     await new Promise(resolve => {
       function frame() {
         const elapsed = (performance.now()-t0)/1000;
         if (elapsed >= totalDur) { resolve(); return; }
-        const loopInfo = needsLoop
-          ? ` · loop ${Math.floor(elapsed/videoDur)+1}`
-          : '';
+        const loopNum = videoDur ? ` · loop ${Math.floor(elapsed/videoDur)+1}` : '';
         setCProg(
           Math.min(94, 60+34*(elapsed/totalDur)),
-          `Recording ${elapsed.toFixed(1)}s / ${totalDur.toFixed(1)}s${loopInfo}`
+          `Recording ${elapsed.toFixed(1)}s / ${totalDur.toFixed(1)}s${loopNum}`
         );
         ctx.drawImage(videoEl, 0, 0, W, H);
         requestAnimationFrame(frame);
@@ -1875,8 +2510,14 @@ async function combineAndDownload() {
       requestAnimationFrame(frame);
     });
 
-    videoEl.pause(); videoEl.loop=false; rec.stop(); src.stop();
-    await new Promise(r => rec.onstop = r);
+    videoEl.pause();
+    videoEl.loop = false;
+    // 300ms flush window — lets the encoder emit its final in-progress chunk
+    // before rec.stop() seals the container.
+    await new Promise(r => setTimeout(r, 300));
+    rec.stop();
+    await new Promise(r => rec.addEventListener('stop', r, { once: true }));
+    try { src.stop(); } catch(e) {}
     finalBlob = new Blob(chunks, {type:'video/webm'});
     setCProg(100, 'Final video ready!');
     showFinalOutput(URL.createObjectURL(finalBlob), true, finalBlob.size);
@@ -2092,10 +2733,135 @@ async function encodeMP3(audioBuffer) {
 
 
 
+// ─── PERSISTENT SETTINGS (localStorage) ─────────────────────────────────────
+const PREF_KEY = 'voxcpm2_prefs_v1';
+const LOGO_KEY = 'voxcpm2_logo_v1';
+
+let _saveTimer = null;
+function debounceSave() { clearTimeout(_saveTimer); _saveTimer = setTimeout(saveSettings, 350); }
+
+function saveSettings() {
+  const get  = id => { const e = document.getElementById(id); return e ? e.value : undefined; };
+  const isOn = id => { const e = document.getElementById(id); return e ? e.classList.contains('on') : false; };
+  const prefs = {
+    autoCropOn: isOn('autocrop-toggle'),
+    fxMode: get('fx-mode'), imgDuration: get('img-duration'), resolution: get('resolution'), selectedFX,
+    logoEnabled, logoPosition,
+    logoAnim: get('logo-anim-select'), logoSize: get('logo-size'),
+    logoSpeed: get('logo-anim-speed'), logoOpacity: get('logo-opacity'),
+    vignetteEnabled,
+    vignetteIntensity: get('vignette-intensity'), vignetteSpread: get('vignette-spread'),
+    textEnabled, textPosition,
+    textContent: get('text-content'), textFamily: get('text-family'), textColor: get('text-color'),
+    textBold: isOn('text-bold-toggle'), textSize: get('text-size'), textOpacity: get('text-opacity'),
+    textShadowOn: isOn('text-shadow-toggle'), textShadowColor: get('text-shadow-color'),
+    textShadowBlur: get('text-shadow-blur'), textShadowOX: get('text-shadow-ox'), textShadowOY: get('text-shadow-oy'),
+    replicateKey, enhanceModel, enhanceScale, faceEnhance,
+  };
+  try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch(e) { console.warn('[prefs] save failed:', e.message); }
+  // Logo image stored separately (can be ~100–300 KB base64)
+  if (logoOverlayImg) {
+    const src = document.getElementById('logo-preview-img').src;
+    if (src && src.startsWith('data:')) {
+      try { localStorage.setItem(LOGO_KEY, src); } catch(e) { console.warn('[prefs] logo too large to persist:', e.message); }
+    }
+  }
+}
+
+function loadSettings() {
+  const raw = localStorage.getItem(PREF_KEY);
+  if (!raw) return;
+  let p; try { p = JSON.parse(raw); } catch(e) { return; }
+
+  const set     = (id, v) => { if (v == null) return; const e = document.getElementById(id); if (e) e.value = v; };
+  const setOn   = (id, on) => { if (on == null) return; const e = document.getElementById(id); if (e) e.classList.toggle('on', !!on); };
+  const show    = (id, v, d='block') => { const e = document.getElementById(id); if (e) e.style.display = v ? d : 'none'; };
+  const setTxt  = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+
+  // Auto crop
+  setOn('autocrop-toggle', p.autoCropOn);
+
+  // Transition
+  set('fx-mode', p.fxMode);
+  if (p.imgDuration != null) { set('img-duration', p.imgDuration); setTxt('dur-val', p.imgDuration + 's'); }
+  set('resolution', p.resolution);
+  if (p.selectedFX) {
+    selectedFX = p.selectedFX;
+    document.querySelectorAll('.fx-card').forEach(c => c.classList.toggle('selected', c.dataset.fx === p.selectedFX));
+  }
+
+  // Logo toggle + options panel
+  if (p.logoEnabled) { logoEnabled = true; setOn('logo-toggle', true); show('logo-options', true); }
+  if (p.logoPosition) {
+    logoPosition = p.logoPosition;
+    document.querySelectorAll('#logo-options .logo-pos-btn').forEach(b => b.classList.toggle('selected', b.dataset.pos === p.logoPosition));
+  }
+  set('logo-anim-select', p.logoAnim);
+  if (p.logoSize    != null) { set('logo-size',       p.logoSize);    setTxt('logo-size-val',  p.logoSize + '%'); }
+  if (p.logoSpeed   != null) { set('logo-anim-speed', p.logoSpeed);   setTxt('logo-speed-val', parseFloat(p.logoSpeed).toFixed(1) + 's'); }
+  if (p.logoOpacity != null) { set('logo-opacity',    p.logoOpacity); setTxt('logo-opacity-val', p.logoOpacity + '%'); }
+
+  // Restore logo image
+  const savedLogo = localStorage.getItem(LOGO_KEY);
+  if (savedLogo) {
+    const img = new Image();
+    img.onload = () => {
+      logoOverlayImg = img;
+      document.getElementById('logo-preview-img').src = savedLogo;
+      show('logo-preview-wrap', true);
+      document.getElementById('logo-info').textContent = `${img.naturalWidth} × ${img.naturalHeight} px`;
+    };
+    img.src = savedLogo;
+  }
+
+  // Vignette
+  if (p.vignetteEnabled) { vignetteEnabled = true; setOn('vignette-toggle', true); show('vignette-opts', true); }
+  if (p.vignetteIntensity != null) { set('vignette-intensity', p.vignetteIntensity); setTxt('vig-int-val', p.vignetteIntensity + '%'); }
+  if (p.vignetteSpread    != null) { set('vignette-spread',    p.vignetteSpread);    setTxt('vig-sp-val',  p.vignetteSpread    + '%'); }
+
+  // Text toggle + options panel
+  if (p.textEnabled) { textEnabled = true; setOn('text-toggle', true); show('text-opts', true); }
+  if (p.textContent != null) set('text-content', p.textContent);
+  set('text-family', p.textFamily);
+  if (p.textColor) set('text-color', p.textColor);
+  setOn('text-bold-toggle', p.textBold);
+  if (p.textSize    != null) { set('text-size',    p.textSize);    setTxt('text-size-val', parseFloat(p.textSize).toFixed(1) + '%'); }
+  if (p.textOpacity != null) { set('text-opacity', p.textOpacity); setTxt('text-op-val',   p.textOpacity + '%'); }
+  if (p.textPosition) {
+    textPosition = p.textPosition;
+    document.querySelectorAll('#text-pos-grid .logo-pos-btn').forEach(b => b.classList.toggle('selected', b.dataset.pos === p.textPosition));
+  }
+  if (p.textShadowOn != null) { setOn('text-shadow-toggle', p.textShadowOn); show('text-shadow-opts', p.textShadowOn, 'grid'); }
+  if (p.textShadowColor) set('text-shadow-color', p.textShadowColor);
+  if (p.textShadowBlur != null) { set('text-shadow-blur', p.textShadowBlur); setTxt('sh-blur-val', p.textShadowBlur + 'px'); }
+  if (p.textShadowOX   != null) { set('text-shadow-ox',   p.textShadowOX);   setTxt('sh-ox-val', (p.textShadowOX > 0 ? '+' : '') + p.textShadowOX + 'px'); }
+  if (p.textShadowOY   != null) { set('text-shadow-oy',   p.textShadowOY);   setTxt('sh-oy-val', (p.textShadowOY > 0 ? '+' : '') + p.textShadowOY + 'px'); }
+
+  // Enhancement (update variables; loadEnhanceSettings() will sync the UI)
+  if (p.replicateKey != null) replicateKey = p.replicateKey;
+  if (p.enhanceModel)         enhanceModel = p.enhanceModel;
+  if (p.enhanceScale != null) enhanceScale = parseInt(p.enhanceScale);
+  if (p.faceEnhance  != null) faceEnhance  = p.faceEnhance;
+}
+
 // ─── INIT ────────────────────────────────────────────────────────────────────
+loadSettings();
 analyzeText();
 checkAPI();
 loadEnhanceSettings();
+
+// Attach debounced save to all slider/input settings
+[
+  'fx-mode','img-duration','resolution',
+  'logo-anim-select','logo-size','logo-anim-speed','logo-opacity',
+  'vignette-intensity','vignette-spread',
+  'text-content','text-family','text-color','text-size','text-opacity',
+  'text-shadow-color','text-shadow-blur','text-shadow-ox','text-shadow-oy',
+  'replicate-key','enhance-model','enhance-scale',
+].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) { el.addEventListener('input', debounceSave); el.addEventListener('change', debounceSave); }
+});
 </script>
 </body>
 </html>
