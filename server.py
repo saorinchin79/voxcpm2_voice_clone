@@ -14,7 +14,9 @@ FAL_MODEL   = 'fal-ai/ltx-video/image-to-video'
 FAL_QUEUE   = f'https://queue.fal.run/{FAL_MODEL}'
 PUBLIC_HOST = os.environ.get('PUBLIC_HOST', 'https://aivoice.saorin.me')
 GRADIO_PORT = int(os.environ.get('GRADIO_PORT', 8808))
-GRADIO_URL  = f'http://localhost:{GRADIO_PORT}'
+# Full override for when the Gradio engine is not on this host — e.g. DP Server
+# reaches the Mac's Gradio through the cloudflared tunnel at https://tts.saorin.me
+GRADIO_URL  = os.environ.get('GRADIO_URL', f'http://localhost:{GRADIO_PORT}').rstrip('/')
 
 TMP_DIR = Path(__file__).parent / '_tmp'
 TMP_DIR.mkdir(exist_ok=True)
