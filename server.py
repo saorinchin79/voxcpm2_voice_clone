@@ -8,7 +8,7 @@ import threading
 import urllib.request
 import urllib.error
 from pathlib import Path
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
 FAL_MODEL   = 'fal-ai/ltx-video/image-to-video'
 FAL_QUEUE   = f'https://queue.fal.run/{FAL_MODEL}'
@@ -156,7 +156,8 @@ class SecureHandler(SimpleHTTPRequestHandler):
 if __name__ == '__main__':
     os.chdir(Path(__file__).parent)
     port = int(os.environ.get('PORT', 9090))
-    server = HTTPServer(('', port), SecureHandler)
-    print(f'Studio → http://localhost:{port}/studio.html')
+    host = os.environ.get('HOST', '127.0.0.1')
+    server = ThreadingHTTPServer((host, port), SecureHandler)
+    print(f'Studio → http://localhost:{port}/studio.html  (bound {host}:{port})')
     print(f'Gradio proxy → /gradio_api/* → {GRADIO_URL}')
     server.serve_forever()
