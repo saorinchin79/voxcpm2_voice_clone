@@ -2380,14 +2380,19 @@ async function callVoxCPM2(segText, ctrl, refWav, usePrompt, promptText, cfgVal,
 
   if (!result) throw new Error('No audio result received from VoxCPM2. Check the model is running and the text is valid.');
 
-  // Build final URL
-  // Normalize URL - replace 0.0.0.0 / 127.0.0.1 with localhost
+  // Build final URL.
+  // Gradio hands back an ABSOLUTE url pointing at whatever host the engine runs on.
+  // When the engine is remote (DP Server proxies to the Mac over the cloudflared
+  // tunnel) that is a different origin from the studio — and this document is
+  // cross-origin-isolated (COEP: require-corp, needed by ffmpeg.wasm), so fetching
+  // it directly is blocked: Gradio sends neither CORS nor CORP headers. Rewrite to a
+  // same-origin path and let the /gradio_api/* proxy fetch it instead. This also
+  // covers the local case, where the engine is a different port on localhost.
   let audioURL = result.url
     ? result.url
     : (API + '/gradio_api/file=' + encodeURIComponent(result.path));
-  audioURL = audioURL
-    .replace('http://0.0.0.0:', 'http://localhost:')
-    .replace('http://127.0.0.1:', 'http://localhost:');
+  const gIdx = audioURL.indexOf('/gradio_api/');
+  if (gIdx > 0) audioURL = API + audioURL.slice(gIdx);
   console.log('[VoxCPM2] Audio URL:', audioURL);
 
   return audioURL;
