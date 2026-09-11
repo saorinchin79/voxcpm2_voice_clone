@@ -823,6 +823,7 @@
             <span style="font-size:0.75rem;font-weight:700" id="segment-badge">1 segment · fits in 1 clip</span>
           </div>
           <div id="segment-preview" style="display:none;margin-top:8px"></div>
+          <div class="help" style="margin-top:6px">💡 Leave a blank line (press Enter twice) between paragraphs — each paragraph is generated and exported as its own MP3 clip.</div>
         </div>
 
         <div class="input-wrap">
@@ -835,13 +836,15 @@
             <div class="tag" onclick="applyPreset(this,'Deep male voice, calm and authoritative')">🎙 Deep Male</div>
             <div class="tag" onclick="applyPreset(this,'Energetic and fast-paced, enthusiastic')">⚡ Energetic</div>
             <div class="tag" onclick="applyPreset(this,'Elderly wise voice, slow and thoughtful')">🌿 Wise Elder</div>
-            <div class="tag" onclick="applyPreset(this,'Khmer female voice, calm and clear')">🇰🇭 Khmer Female</div>
-            <div class="tag" onclick="applyPreset(this,'Khmer male voice, warm and friendly')">🇰🇭 Khmer Male</div>
             <div class="tag" onclick="applyPreset(this,'Young cheerful voice, upbeat and friendly')">😊 Cheerful</div>
             <div class="tag" onclick="applyPreset(this,'Professional news anchor voice, clear and neutral')">📰 Newscaster</div>
             <div class="tag" onclick="applyPreset(this,'Soft storytelling voice, warm and immersive')">📖 Storyteller</div>
             <div class="tag" onclick="applyPreset(this,'Slightly faster, cheerful tone')">🚀 Fast Cheerful</div>
           </div>
+
+          <label class="input-label" style="margin-top:1rem">🇰🇭 Khmer Voice Library <span style="color:var(--text3);font-size:0.7rem;margin-left:6px">Voice Design · no reference audio needed</span></label>
+          <div class="tags" id="khmer-voice-tags"></div>
+          <div class="help" style="margin-top:6px">Original Voice Design personas rendered by VoxCPM2's native Khmer support. Edit any description freely — the text drives the voice, so small wording changes reshape timbre and pace.</div>
         </div>
 
         <div class="divider"></div>
@@ -899,6 +902,14 @@
         </div>
 
         <div class="setting-row">
+          <div><div class="setting-label">🔗 Voice Lock (long-form)</div><div class="setting-sub">Every clip using a voice reuses that voice's first render — same pick, same sound</div></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="btn btn-outline" onclick="rerollVoices()" style="padding:4px 10px;font-size:0.72rem" title="Forget locked-in voices and roll new ones">🎲 Reroll</button>
+            <div class="toggle on" id="voicelock-toggle" onclick="this.classList.toggle('on')"></div>
+          </div>
+        </div>
+
+        <div class="setting-row">
           <div><div class="setting-label">Text Normalization</div><div class="setting-sub">Normalize numbers, dates, abbreviations</div></div>
           <div class="toggle" id="normalize-toggle" onclick="this.classList.toggle('on')"></div>
         </div>
@@ -936,7 +947,8 @@
           <div class="output-area"><div class="output-empty">Generated audio segments will appear here</div></div>
         </div>
         <div id="audio-actions" style="display:none;margin-top:1rem;gap:1rem;align-items:center">
-          <button class="btn btn-outline" onclick="downloadAllAudio()">⬇ Download All MP3s</button>
+          <button class="btn btn-outline" onclick="downloadAllAudio(this)">⬇ Download All MP3s</button>
+          <button class="btn btn-primary" onclick="downloadContinuousAudio(this)">⬇ Download as One Track</button>
           <span style="font-size:0.75rem;color:var(--text3);font-family:var(--mono)" id="audio-meta"></span>
         </div>
       </div>
@@ -1054,6 +1066,76 @@ let vignetteEnabled   = false;
 let textEnabled       = false;
 let textPosition      = 'bottom-center';
 let generatedSegments = [];
+// Per-clip voice-clone reference files, keyed by clip index. Assigned in the
+// text preview before generation; each clip falls back to the global Reference
+// Audio (or default voice) when it has no entry here.
+let clipVoices = {};
+
+// Khmer Voice Design personas — the single source for both the global preset row
+// and every per-clip picker. `desc` is sent as the control instruction; there is
+// no reference audio, so these cost nothing to switch between.
+const KHMER_VOICES = [
+  {name:'Sokha',   tag:'Clear',     gender:'F', desc:'Khmer female voice, calm and clear, natural mid pitch, neutral broadcast delivery'},
+  {name:'Chantha', tag:'Warm',      gender:'F', desc:'Khmer female voice, warm and gentle, soft and reassuring, unhurried pace'},
+  {name:'Davi',    tag:'Bright',    gender:'F', desc:'Khmer female voice, young and bright, cheerful and upbeat, lively pace'},
+  {name:'Kanha',   tag:'News',      gender:'F', desc:'Khmer female voice, professional news anchor, crisp articulation, authoritative and neutral'},
+  {name:'Sophea',  tag:'Story',     gender:'F', desc:'Khmer female voice, soft storytelling tone, intimate and immersive, slow and expressive'},
+  {name:'Mealea',  tag:'Doc',       gender:'F', desc:'Khmer female voice, mature and composed, documentary narration, measured and thoughtful'},
+  {name:'Dara',    tag:'Warm',      gender:'M', desc:'Khmer male voice, warm and friendly, natural conversational tone, relaxed pace'},
+  {name:'Vuthy',   tag:'Deep',      gender:'M', desc:'Khmer male voice, deep and calm, authoritative and grounded, slow steady delivery'},
+  {name:'Rithi',   tag:'Energetic', gender:'M', desc:'Khmer male voice, young and energetic, enthusiastic and fast-paced, upbeat'},
+  {name:'Piseth',  tag:'News',      gender:'M', desc:'Khmer male voice, professional news anchor, clear and neutral, confident broadcast delivery'},
+  {name:'Sarith',  tag:'Elder',     gender:'M', desc:'Khmer male voice, elderly and wise, slow and thoughtful, gentle gravelly warmth'},
+  {name:'Kosal',   tag:'Narrator',  gender:'M', desc:'Khmer male voice, smooth narrator, rich and even tone, cinematic and unhurried'},
+];
+const khmerVoiceLabel = v => `${v.gender === 'F' ? '♀' : '♂'} ${v.name} · ${v.tag}`;
+
+// Cache of rendered voice previews, keyed "clipIndex:voiceName", so re-listening
+// to a voice you already auditioned is instant instead of a fresh 7s render.
+const clipPreviewCache = new Map();
+
+// Session-level voice anchors, shared by previews AND generation. Voice Design is
+// non-deterministic — the same description renders a noticeably different speaker
+// each call — so the first render of a given voice is kept and replayed as the
+// reference for every later use of it. Without this, picking "Sokha" on two clips
+// yields two different Sokhas. Keyed per voice so distinct voices stay distinct.
+const voiceAnchors = new Map();   // key -> {refWav, text}
+
+// Persona → its own key. Otherwise key on the instruction text, so editing the
+// global Control Instruction naturally rolls a new voice instead of being pinned
+// to a stale one.
+const voiceAnchorKey = (voice, ctrl) =>
+  isKhmerVoice(voice) ? 'khmer:' + voice.name : 'ctrl:' + (ctrl || '').trim();
+
+// Store a rendered clip as the canonical voice for `key` (first render wins).
+async function captureVoiceAnchor(key, blob, text, uploader) {
+  if (!key || voiceAnchors.has(key) || !blob || blob.size === 0) return;
+  try {
+    const ref = await uploader(new File([blob], 'voice-anchor.wav', {type: 'audio/wav'}));
+    if (ref) {
+      voiceAnchors.set(key, {refWav: ref, text});
+      console.log('[VoxCPM2] Voice anchor set for', key);
+    }
+  } catch(e) {
+    console.warn('[VoxCPM2] Voice anchor capture failed, continuing unlocked:', e);
+  }
+}
+
+// Upload a File to Gradio and return a ref_wav descriptor (null on failure).
+async function uploadRefWav(file) {
+  const fd = new FormData(); fd.append('files', file);
+  const up = await fetch(API+'/gradio_api/upload', {method:'POST', body:fd});
+  if (!up.ok) return null;
+  return {path:(await up.json())[0], meta:{_type:'gradio.FileData'}, orig_name:file.name};
+}
+
+function renderKhmerVoiceTags() {
+  const box = document.getElementById('khmer-voice-tags');
+  if (!box) return;
+  box.innerHTML = KHMER_VOICES.map(v =>
+    `<div class="tag" onclick="applyPreset(this, ${JSON.stringify(v.desc).replace(/"/g,'&quot;')})">◎ ${khmerVoiceLabel(v)}</div>`
+  ).join('');
+}
 
 // ─── PAGE NAVIGATION ────────────────────────────────────────────────────────
 function showPage(name) {
@@ -1942,6 +2024,9 @@ function showSidebarVideo() { document.getElementById('sidebar-video-empty').sty
 // ~14 chars/sec is average TTS speed; 29s limit = 406 chars max per segment
 const CHARS_PER_SEC = 14;
 const MAX_CHARS     = 29 * CHARS_PER_SEC; // 406
+// Silence inserted between clips when exporting one continuous track, so
+// paragraph breaks land as pauses instead of hard splices.
+const PARAGRAPH_GAP_SEC = 0.35;
 
 function splitTextToSegments(rawText) {
   if (!rawText.trim()) return [];
@@ -1953,12 +2038,9 @@ function splitTextToSegments(rawText) {
 
   for (const para of paragraphs) {
     if (para.length <= MAX_CHARS) {
-      // Whole paragraph fits → push as-is, merging with previous if both are small
-      if (segments.length > 0 && (segments[segments.length-1] + ' ' + para).length <= MAX_CHARS) {
-        segments[segments.length-1] += ' ' + para;
-      } else {
-        segments.push(para);
-      }
+      // One paragraph = one clip. Never merge with a neighbouring paragraph, so a
+      // blank line (double-enter) always starts a brand-new MP3 clip.
+      segments.push(para);
       continue;
     }
 
@@ -2014,12 +2096,15 @@ function analyzeText() {
   const badge   = document.getElementById('segment-badge');
   const preview = document.getElementById('segment-preview');
 
+  // Drop voice assignments for clips that no longer exist (text shrank)
+  Object.keys(clipVoices).forEach(k => { if (+k >= n) delete clipVoices[k]; });
+
   if (n <= 1) {
-    badge.textContent = '1 segment · fits in 1 clip';
+    badge.textContent = '1 clip · 1 MP3';
     badge.style.color = 'var(--green)';
     preview.style.display = 'none';
   } else {
-    badge.textContent = `${n} segments · auto-split at paragraph/sentence boundaries`;
+    badge.textContent = `${n} clips · one MP3 per paragraph (blank line = new clip)`;
     badge.style.color = 'var(--gold)';
     preview.style.display = 'block';
     preview.innerHTML = segs.map((s,i) => `
@@ -2027,9 +2112,149 @@ function analyzeText() {
         <div style="font-size:0.72rem;color:var(--text3);margin-bottom:3px;font-weight:700">
           Clip ${i+1} · ~${Math.round(s.length/CHARS_PER_SEC)}s · ${s.length} chars
         </div>
-        <div style="font-size:0.78rem;color:var(--text2);line-height:1.5">${s.substring(0,130)}${s.length>130?'…':''}</div>
+        <div style="font-size:0.78rem;color:var(--text2);line-height:1.5;margin-bottom:8px">${s.substring(0,130)}${s.length>130?'…':''}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <input type="file" id="clip-voice-input-${i}" accept="audio/*" style="display:none" onchange="setClipVoice(${i}, this)">
+          <label class="file-upload-btn" for="clip-voice-input-${i}" style="padding:5px 10px;font-size:0.72rem;flex:0 0 auto">🎤 Upload voice clone</label>
+          <select id="clip-khmer-select-${i}" onchange="setClipKhmerVoice(${i}, this.value)"
+                  style="padding:5px 8px;font-size:0.72rem;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:6px;max-width:190px">
+            <option value="">🇰🇭 Khmer voice…</option>
+            ${KHMER_VOICES.map(v => `<option value="${v.name}">${khmerVoiceLabel(v)}</option>`).join('')}
+          </select>
+          <button class="btn btn-outline" id="clip-preview-btn-${i}" onclick="previewClipVoice(${i})"
+                  style="padding:5px 10px;font-size:0.72rem">▶ Preview</button>
+          <span id="clip-voice-status-${i}" style="font-size:0.72rem;color:var(--text3)"></span>
+        </div>
+        <div id="clip-preview-audio-${i}" style="margin-top:6px"></div>
       </div>`).join('');
+    // Restore each clip's assigned-voice label from state (inputs can't be repopulated)
+    segs.forEach((s,i) => renderClipVoiceStatus(i));
   }
+}
+
+// A clip's voice is either an uploaded clone File or a Khmer persona object.
+const isKhmerVoice = v => !!(v && v.khmer);
+
+// Show the assigned voice (clone filename or Khmer persona) under a preview clip.
+function renderClipVoiceStatus(i) {
+  const el = document.getElementById(`clip-voice-status-${i}`);
+  if (!el) return;
+  const v = clipVoices[i];
+  if (v) {
+    const label = isKhmerVoice(v) ? `🇰🇭 ${khmerVoiceLabel(v)}` : v.name;
+    el.innerHTML = `<span style="color:var(--green);font-weight:700">✓ ${label}</span>
+      <span onclick="clearClipVoice(${i})" style="cursor:pointer;color:var(--red);margin-left:6px" title="Remove voice">✕</span>`;
+  } else {
+    el.textContent = '— uses default / global reference';
+  }
+}
+
+// Assign a voice-clone file to a specific clip (index-keyed, survives typing).
+// An uploaded clone replaces any Khmer persona on the same clip.
+function setClipVoice(i, input) {
+  const f = input.files[0];
+  if (f) {
+    clipVoices[i] = f;
+    const sel = document.getElementById(`clip-khmer-select-${i}`);
+    if (sel) sel.value = '';
+  } else {
+    delete clipVoices[i];
+  }
+  renderClipVoiceStatus(i);
+}
+
+// Assign a Khmer Voice Design persona to a clip. Clears any uploaded clone so the
+// two voice sources can never both be set on one clip.
+function setClipKhmerVoice(i, name) {
+  if (!name) {
+    if (isKhmerVoice(clipVoices[i])) delete clipVoices[i];
+  } else {
+    const v = KHMER_VOICES.find(x => x.name === name);
+    if (!v) return;
+    clipVoices[i] = {khmer: true, ...v};
+    const input = document.getElementById(`clip-voice-input-${i}`);
+    if (input) input.value = '';
+  }
+  renderClipVoiceStatus(i);
+}
+
+// Remove a clip's assigned voice → it reverts to the global reference / default.
+function clearClipVoice(i) {
+  delete clipVoices[i];
+  const input = document.getElementById(`clip-voice-input-${i}`);
+  if (input) input.value = '';
+  const sel = document.getElementById(`clip-khmer-select-${i}`);
+  if (sel) sel.value = '';
+  renderClipVoiceStatus(i);
+}
+
+// Audition a clip's chosen voice on that clip's own opening words, so you hear the
+// voice against the real line rather than a generic sample. Results are cached per
+// clip+voice, so switching back and forth is instant after the first render.
+async function previewClipVoice(i) {
+  const segs = splitTextToSegments(document.getElementById('target-text').value.trim());
+  const text = (segs[i] || '').substring(0, 100).trim();
+  if (!text) return alert('This clip has no text to preview.');
+
+  const v   = clipVoices[i];
+  const box = document.getElementById(`clip-preview-audio-${i}`);
+  const btn = document.getElementById(`clip-preview-btn-${i}`);
+  if (!box || !btn) return;
+
+  const key = `${i}:${isKhmerVoice(v) ? v.name : (v ? 'clone:'+v.name : 'default')}:${text}`;
+  if (clipPreviewCache.has(key)) return playClipPreview(box, clipPreviewCache.get(key));
+
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Rendering…';
+  box.innerHTML = '<span style="font-size:0.72rem;color:var(--text3)">Rendering preview…</span>';
+  try {
+    const globalCtrl = document.getElementById('control-instruction').value.trim();
+    let refWav = null, ctrl = globalCtrl, usePrompt = false, promptTxt = '';
+    let anchorKey = null;
+
+    if (v && !isKhmerVoice(v)) {
+      // Uploaded clone: its own audio is the voice, so no anchoring is involved.
+      refWav = await uploadRefWav(v);
+    } else {
+      if (isKhmerVoice(v)) ctrl = v.desc;
+      anchorKey = voiceAnchorKey(v, ctrl);
+      // Reuse this voice's established sound so every clip using it matches, and
+      // so the preview is what generation will actually produce.
+      const anchor = voiceAnchors.get(anchorKey);
+      if (anchor) {
+        refWav = anchor.refWav; usePrompt = true; promptTxt = anchor.text; ctrl = '';
+      }
+    }
+
+    const url  = await callVoxCPM2(text, ctrl, refWav, usePrompt, promptTxt,
+                   parseFloat(document.getElementById('cfg-val').value), true, false,
+                   parseInt(document.getElementById('dit-steps').value));
+    const blob = await (await fetch(url, {mode:'cors', credentials:'omit'})).blob();
+    // First render of this voice becomes its anchor for all later clips.
+    await captureVoiceAnchor(anchorKey, blob, text, uploadRefWav);
+    const obj  = URL.createObjectURL(blob);
+    clipPreviewCache.set(key, obj);
+    playClipPreview(box, obj);
+  } catch(e) {
+    console.error('[VoxCPM2] Clip preview failed:', e);
+    box.innerHTML = `<span style="font-size:0.72rem;color:var(--red)">⚠ Preview failed: ${e.message}</span>`;
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
+  }
+}
+
+// Forget every established voice so the next render rolls fresh ones. Use this when
+// a locked-in voice isn't the one you wanted — the personas are non-deterministic,
+// so the same description can be re-rolled until it lands.
+function rerollVoices() {
+  voiceAnchors.clear();
+  clipPreviewCache.forEach(url => URL.revokeObjectURL(url));
+  clipPreviewCache.clear();
+  document.querySelectorAll('[id^="clip-preview-audio-"]').forEach(el => el.innerHTML = '');
+}
+
+function playClipPreview(box, url) {
+  box.innerHTML = `<audio controls autoplay src="${url}" style="width:100%;max-width:340px;border-radius:6px"></audio>`;
 }
 
 // ─── VOICE CONTROLS ──────────────────────────────────────────────────────────
@@ -2210,7 +2435,8 @@ async function generateVoice() {
         <div style="font-size:0.75rem;font-weight:700;color:var(--text3)">Clip ${i+1} / ${n} · ~${Math.round(s.length/CHARS_PER_SEC)}s · ${s.length} chars</div>
         <div class="status-badge status-idle" id="seg-status-${i}"><div class="status-dot"></div>Waiting</div>
       </div>
-      <div style="font-size:0.78rem;color:var(--text2);margin-bottom:8px;line-height:1.5">${s.substring(0,120)}${s.length>120?'…':''}</div>
+      <div style="font-size:0.78rem;color:var(--text2);margin-bottom:6px;line-height:1.5">${s.substring(0,120)}${s.length>120?'…':''}</div>
+      <div style="font-size:0.7rem;color:var(--text3);margin-bottom:8px">🎤 ${clipVoices[i] ? `<span style="color:var(--accent2);font-weight:700">${isKhmerVoice(clipVoices[i]) ? '🇰🇭 '+khmerVoiceLabel(clipVoices[i]) : clipVoices[i].name}</span>` : (refFile ? refFile.name + ' (global)' : 'Default voice')}</div>
       <div id="seg-audio-${i}" style="font-size:0.75rem;color:var(--text3)">—</div>
     </div>`).join('');
 
@@ -2218,23 +2444,58 @@ async function generateVoice() {
   document.getElementById('output-status').innerHTML = '<div class="status-dot spin"></div>Generating';
 
   try {
-    // Upload reference audio once (reused for all segments)
-    setVProg(8, 'Uploading reference audio...');
-    let refWav = null;
-    if (refFile) {
-      const fd = new FormData(); fd.append('files', refFile);
-      const uploadRes = await fetch(API+'/gradio_api/upload', {method:'POST', body:fd});
-      if (uploadRes.ok) {
-        const paths = await uploadRes.json();
-        refWav = {path: paths[0], meta: {_type:'gradio.FileData'}, orig_name: refFile.name};
-      }
+    // Upload each distinct reference audio once, caching by File so the same
+    // voice isn't re-uploaded for every clip that uses it.
+    setVProg(8, 'Preparing reference audio...');
+    const uploadCache = new Map(); // File -> refWav object (or null on failure)
+    async function getRefWav(file) {
+      if (!file) return null;
+      if (uploadCache.has(file)) return uploadCache.get(file);
+      let refWav = null;
+      try {
+        const fd = new FormData(); fd.append('files', file);
+        const uploadRes = await fetch(API+'/gradio_api/upload', {method:'POST', body:fd});
+        if (uploadRes.ok) {
+          const paths = await uploadRes.json();
+          refWav = {path: paths[0], meta: {_type:'gradio.FileData'}, orig_name: file.name};
+        }
+      } catch(e) { console.warn('Ref upload failed for', file.name, e); }
+      uploadCache.set(file, refWav);
+      return refWav;
     }
 
-    // Generate each segment sequentially
+    // Voice Lock reuses the session-level `voiceAnchors` registry, so a voice first
+    // heard in a preview renders identically here rather than being rolled again.
+    const voiceLock = document.getElementById('voicelock-toggle').classList.contains('on');
+
+    // Generate each segment sequentially, each with its own voice clone if set
     for (let i = 0; i < n; i++) {
-      const segText = segments[i];
-      const pct     = 10 + 85*(i/n);
-      setVProg(pct, `Generating clip ${i+1} of ${n}...`);
+      const segText  = segments[i];
+      const assigned = clipVoices[i];                       // clone File | Khmer persona | undefined
+      const khmer    = isKhmerVoice(assigned) ? assigned : null;
+      // A Khmer persona is driven by its description, not by reference audio, so it
+      // never contributes an upload — only clone files fall through to getRefWav.
+      const segFile  = khmer ? null : (assigned || refFile);
+      let   refWav   = await getRefWav(segFile);
+      let   segCtrl  = khmer ? khmer.desc : ctrl;
+      let   segUsePrompt = usePrompt, segPromptText = promptText;
+
+      // Clips backed by an actual audio file (per-clip clone or global reference)
+      // already have a fixed voice, so they opt out of locking entirely.
+      const lockKey = segFile ? null : voiceAnchorKey(khmer, segCtrl);
+      const lock    = voiceLock && lockKey ? voiceAnchors.get(lockKey) : null;
+      if (lock) {
+        refWav        = lock.refWav;
+        segUsePrompt  = true;
+        segPromptText = lock.text;
+        segCtrl       = '';   // app.py drops control when use_prompt_text is set
+      }
+
+      const voiceNote = khmer ? ` · 🇰🇭 ${khmer.name}${lock ? ' 🔗' : ''}`
+                      : segFile ? ' · '+segFile.name
+                      : lock ? ' · 🔗 locked' : '';
+      const pct = 10 + 85*(i/n);
+      setVProg(pct, `Generating clip ${i+1} of ${n}${voiceNote}...`);
 
       // Mark card active
       const card = document.getElementById(`seg-card-${i}`);
@@ -2247,7 +2508,7 @@ async function generateVoice() {
 
       let audioURL;
       try {
-        audioURL = await callVoxCPM2(segText, ctrl, refWav, usePrompt, promptText, cfgVal, doNorm, denoise, ditSteps);
+        audioURL = await callVoxCPM2(segText, segCtrl, refWav, segUsePrompt, segPromptText, cfgVal, doNorm, denoise, ditSteps);
       } catch(segErr) {
         card.style.borderColor = 'var(--red)';
         st.className = 'status-badge status-err';
@@ -2274,6 +2535,10 @@ async function generateVoice() {
       }
       generatedSegments.push({text: segText, url: audioURL, blob, blobURL});
 
+      // First clip of each distinct voice becomes that voice's anchor for the rest
+      // of the session, so later clips and previews all match it.
+      if (voiceLock) await captureVoiceAnchor(lockKey, blob, segText, getRefWav);
+
       // Update card
       card.style.borderColor = 'var(--green)';
       card.style.borderWidth  = '1px';
@@ -2296,7 +2561,7 @@ async function generateVoice() {
       segDiv.appendChild(audioEl);
       segDiv.insertAdjacentHTML('beforeend',
         `<div id="seg-audio-err-${i}" style="font-size:0.72rem;color:var(--red);margin-bottom:4px"></div>
-         <button class="btn btn-outline" style="font-size:0.72rem;padding:4px 10px" onclick="downloadSingleAudio(${i})">⬇ Clip ${i+1}</button>`);
+         <button class="btn btn-outline clip-dl-btn" style="font-size:0.72rem;padding:4px 10px" onclick="downloadSingleAudio(${i}, this)">⬇ Clip ${i+1} MP3</button>`);
     }
 
     // All segments done
@@ -2333,15 +2598,94 @@ function setVoiceStatus(type, text) {
   el.innerHTML = `<div class="status-dot${type==='running'?' spin':''}"></div> ${text}`;
 }
 
-function downloadSingleAudio(idx) {
-  if (!generatedSegments[idx]) return;
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(generatedSegments[idx].blob);
-  a.download = `voxcpm2_clip_${idx+1}.wav`;
-  a.click();
+// Convert a clip's raw WAV blob → MP3 blob, cached on the segment so repeat
+// downloads are instant. Reuses the lamejs encodeMP3() helper used for final audio.
+async function segmentToMp3(seg) {
+  if (seg.mp3Blob) return seg.mp3Blob;
+  if (!seg.blob || seg.blob.size === 0) throw new Error('No audio data for this clip');
+  const ctx = new AudioContext();
+  let audioBuf;
+  try {
+    audioBuf = await ctx.decodeAudioData(await seg.blob.arrayBuffer());
+  } finally {
+    try { await ctx.close(); } catch(e) {}
+  }
+  seg.mp3Blob = await encodeMP3(audioBuf);
+  return seg.mp3Blob;
 }
-function downloadAllAudio() {
-  generatedSegments.forEach((s,i) => setTimeout(() => downloadSingleAudio(i), i*400));
+
+// Download one clip as an individual MP3 (one paragraph → one MP3 file).
+async function downloadSingleAudio(idx, btn) {
+  const seg = generatedSegments[idx];
+  if (!seg) return;
+  const orig = btn ? btn.textContent : '';
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ MP3…'; }
+    const mp3 = await segmentToMp3(seg);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(mp3);
+    a.download = `voxcpm2_clip_${idx+1}.mp3`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    if (btn) btn.textContent = '✅ Saved';
+  } catch(e) {
+    console.error('Clip MP3 conversion failed:', e);
+    // Fallback: hand the user the raw WAV so they still get audio
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(seg.blob);
+    a.download = `voxcpm2_clip_${idx+1}.wav`;
+    a.click();
+    if (btn) btn.textContent = '⬇ WAV (MP3 failed)';
+  } finally {
+    if (btn) setTimeout(() => { btn.disabled = false; btn.textContent = orig || `⬇ Clip ${idx+1} MP3`; }, 1600);
+  }
+}
+
+// Convert & download every clip as its own MP3, sequentially (lamejs + browser
+// downloads don't like being fired all at once).
+async function downloadAllAudio(btn) {
+  const b = btn || document.querySelector('#audio-actions button');
+  const orig = b ? b.textContent : '';
+  const n = generatedSegments.length;
+  if (!n) return;
+  try {
+    if (b) b.disabled = true;
+    for (let i = 0; i < n; i++) {
+      if (b) b.textContent = `⏳ MP3 ${i+1}/${n}…`;
+      await downloadSingleAudio(i);
+      await new Promise(r => setTimeout(r, 350)); // stagger so each download registers
+    }
+    if (b) b.textContent = `✅ ${n} MP3${n>1?'s':''} saved`;
+  } finally {
+    if (b) setTimeout(() => { b.disabled = false; b.textContent = orig || '⬇ Download All MP3s'; }, 2000);
+  }
+}
+
+// Export the whole script as a single continuous WAV instead of one file per
+// paragraph. Segments are joined in order with a short silence between them so
+// paragraph breaks still read as pauses rather than hard cuts.
+async function downloadContinuousAudio(btn) {
+  const n = generatedSegments.length;
+  if (!n) return alert('Generate audio segments first!');
+  const b = btn;
+  const orig = b ? b.textContent : '';
+  try {
+    if (b) { b.disabled = true; b.textContent = `⏳ Joining ${n} clip${n>1?'s':''}…`; }
+    const wav = await concatAudioBlobs(generatedSegments.map(s => s.blob), PARAGRAPH_GAP_SEC);
+    const url = URL.createObjectURL(wav);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `voxcpm2-continuous-${Date.now()}.wav`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    if (b) b.textContent = `✅ ${Math.round(wav.size/1024)}KB saved`;
+  } catch(e) {
+    console.error('[VoxCPM2] Continuous export failed:', e);
+    alert('Could not join clips: ' + e.message);
+    if (b) b.textContent = orig;
+  } finally {
+    if (b) setTimeout(() => { b.disabled = false; b.textContent = orig || '⬇ Download as One Track'; }, 2000);
+  }
 }
 
 function resetVoice() {
@@ -2358,16 +2702,18 @@ function resetVoice() {
   document.getElementById('denoise-toggle').classList.remove('on');
   document.getElementById('prompt-text-wrap').style.display = 'none';
   document.querySelectorAll('#preset-tags .tag').forEach(t => t.classList.remove('active'));
+  rerollVoices();
   setVoiceStatus('idle','Idle');
   document.getElementById('output-status').className = 'status-badge status-idle';
   document.getElementById('output-status').innerHTML = '<div class="status-dot"></div>Waiting';
   document.getElementById('ref-audio-input')._file = null;
   generatedSegments = []; finalBlob = null;
+  clipVoices = {};
   analyzeText();
 }
 
 // ─── AUDIO CONCATENATION (Web Audio API) ─────────────────────────────────────
-async function concatAudioBlobs(blobs) {
+async function concatAudioBlobs(blobs, gapSec = 0) {
   const audioCtx = new AudioContext();
 
   // Decode all segments in parallel, with per-segment error context
@@ -2381,19 +2727,22 @@ async function concatAudioBlobs(blobs) {
 
   const sr       = decoded[0].sampleRate;
   const ch       = decoded[0].numberOfChannels;
-  const totalLen = decoded.reduce((a, b) => a + b.length, 0);
+  const gapLen   = Math.max(0, Math.round(gapSec * sr));
+  const totalLen = decoded.reduce((a, b) => a + b.length, 0)
+                 + gapLen * Math.max(0, decoded.length - 1);
 
   // Direct Float32 copy — no OfflineAudioContext, no startRendering() wait.
   // OfflineAudioContext.startRendering() runs at pseudo-realtime speed, so a
   // 60-second audio would take ~60 seconds to process. Direct PCM copy is instant.
   const merged = audioCtx.createBuffer(ch, totalLen, sr);
   let offset = 0;
-  for (const buf of decoded) {
+  decoded.forEach((buf, i) => {
     for (let c = 0; c < ch; c++) {
       merged.getChannelData(c).set(buf.getChannelData(c), offset);
     }
-    offset += buf.length;
-  }
+    // Buffers start zeroed, so advancing past the gap leaves it as silence.
+    offset += buf.length + (i < decoded.length - 1 ? gapLen : 0);
+  });
 
   await audioCtx.close();
   return new Blob([audioBufferToWav(merged)], {type: 'audio/wav'});
@@ -2846,6 +3195,7 @@ function loadSettings() {
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
 loadSettings();
+renderKhmerVoiceTags();
 analyzeText();
 checkAPI();
 loadEnhanceSettings();

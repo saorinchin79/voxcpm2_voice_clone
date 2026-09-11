@@ -155,7 +155,7 @@ class SecureHandler(SimpleHTTPRequestHandler):
 
 if __name__ == '__main__':
     os.chdir(Path(__file__).parent)
-    port = int(os.environ.get('PORT', 8080))
+    port = int(os.environ.get('PORT', 9090))
     server = HTTPServer(('', port), SecureHandler)
     print(f'Studio → http://localhost:{port}/studio.html')
     print(f'Gradio proxy → /gradio_api/* → {GRADIO_URL}')
