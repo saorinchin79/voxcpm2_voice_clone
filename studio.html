@@ -45,7 +45,7 @@
   .app { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; }
 
   /* NAV */
-  nav { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; border-bottom: 1px solid var(--border); background: rgba(10,10,15,0.8); backdrop-filter: blur(20px); position: sticky; top: 0; z-index: 100; }
+  nav { display: flex; flex-wrap: wrap; row-gap: 10px; align-items: center; justify-content: space-between; padding: 1rem 2rem; border-bottom: 1px solid var(--border); background: rgba(10,10,15,0.8); backdrop-filter: blur(20px); position: sticky; top: 0; z-index: 100; }
   .logo { font-size: 1.1rem; font-weight: 800; letter-spacing: -0.02em; display: flex; align-items: center; gap: 8px; }
   .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -53,6 +53,20 @@
   .nav-tab { padding: 6px 16px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s; color: var(--text2); border: none; background: transparent; font-family: var(--font); }
   .nav-tab.active { background: var(--accent); color: white; }
   .nav-tab:hover:not(.active) { color: var(--text); background: var(--bg4); }
+  .nav-right { display: flex; align-items: center; gap: 10px; }
+  .user-chip { display: flex; align-items: center; gap: 8px; background: var(--bg3); border: 1px solid var(--border); border-radius: 20px; padding: 4px 6px 4px 4px; }
+  .user-chip-avatar { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: white; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; display: flex; align-items: center; justify-content: center; }
+  .user-chip-name { font-size: 0.78rem; font-weight: 600; color: var(--text2); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-chip-out { padding: 4px 10px; border-radius: 14px; font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: all 0.2s; color: var(--text3); border: none; background: transparent; font-family: var(--font); }
+  .user-chip-out:hover { color: var(--red); background: rgba(239,68,68,0.12); }
+  /* Narrow screens drop the name, never the way out. */
+  @media (max-width: 720px) { .user-chip-name { display: none; } }
+  /* Under ~480px the logo, tabs and right-hand group no longer fit on one row:
+     the tabs take their own line so the sign-out chip stays inside the viewport. */
+  @media (max-width: 480px) {
+    nav { padding: 0.75rem 1rem; }
+    .nav-tabs { order: 3; flex: 1 0 100%; justify-content: center; }
+  }
 
   /* PAGES */
   .page { display: none; padding: 2rem; max-width: 1400px; margin: 0 auto; width: 100%; }
@@ -225,9 +239,16 @@
       <button class="nav-tab" id="tab-review" onclick="showPage('review')" style="display:none">▶ Review</button>
       <button class="nav-tab" onclick="showPage('voice')">◎ Voice</button>
     </div>
-    <div class="status-badge status-idle" id="global-status">
-      <div class="status-dot"></div>
-      Idle
+    <div class="nav-right">
+      <div class="status-badge status-idle" id="global-status">
+        <div class="status-dot"></div>
+        Idle
+      </div>
+      <div class="user-chip" id="user-chip" style="display:none">
+        <div class="user-chip-avatar" id="user-chip-avatar"></div>
+        <div class="user-chip-name" id="user-chip-name"></div>
+        <button class="user-chip-out" onclick="signOut()">Sign out</button>
+      </div>
     </div>
   </nav>
 
@@ -1056,6 +1077,76 @@
 
 <script>
 const API = '';
+
+// ─── SESSION ─────────────────────────────────────────────────────────────────
+// An expired session should land the user on the login page, not on an error
+// that reads like the engine went down. Every authenticated fetch routes its
+// response through handleAuthFailure() and bails when it returns true.
+function handleAuthFailure(res) {
+  if (res.status !== 401) return false;
+  location.replace('/login.html?next=' + encodeURIComponent(location.pathname + location.search));
+  return true;
+}
+
+// The studio front-end runs on DP Server but the TTS engine is the Mac, reached over
+// a cloudflared tunnel. When the Mac is asleep or offline the proxy hands back either
+// Cloudflare's own 530 ("Error 1033 Argo Tunnel error") or a 502 from server.py, both
+// with a body that is raw HTML. Dumping that into the UI tells the user nothing, so
+// collapse the whole unreachable-upstream family into one plain sentence.
+const ENGINE_DOWN_CODES = [502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 530];
+function engineError(res, detail) {
+  if (ENGINE_DOWN_CODES.indexOf(res.status) !== -1) {
+    return new Error('TTS engine offline \u2014 the voice server is not reachable right now. '
+                   + 'It is back as soon as the engine host is awake and online. (HTTP ' + res.status + ')');
+  }
+  const trimmed = (detail || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+  return new Error('Engine request failed (' + res.status + ')' + (trimmed ? ': ' + trimmed : ''));
+}
+
+// Tagged so local catch blocks can recognise and re-throw it: swallowing a dead
+// session turns a failed call into a silently wrong result (default voice, empty
+// clip, green card) instead of a bounce to the login page.
+function sessionExpiredError() {
+  const e = new Error('Session expired — redirecting to sign in');
+  e.status = 401;
+  return e;
+}
+
+async function loadSession() {
+  let res;
+  try {
+    res = await fetch('/api/me', {credentials: 'same-origin'});
+  } catch(e) {
+    return; // server unreachable: leave the chip hidden rather than bounce to login
+  }
+  if (handleAuthFailure(res) || !res.ok) return;
+  const data = await res.json();
+  const name = (data.user && data.user.username) || '';
+  if (!name) return;
+  document.getElementById('user-chip-avatar').textContent = name.charAt(0);
+  document.getElementById('user-chip-name').textContent   = name;
+  document.getElementById('user-chip').style.display      = 'flex';
+}
+
+async function signOut() {
+  try {
+    await fetch('/api/logout', {method: 'POST', credentials: 'same-origin'});
+  } finally {
+    // Shared machine: the next user must not inherit this one's paid API key.
+    // Each wipe is isolated so a storage exception cannot block the navigation.
+    try { sessionStorage.clear(); } catch(e) {}
+    try {
+      const raw = localStorage.getItem(PREF_KEY);
+      if (raw) {
+        const p = JSON.parse(raw);
+        delete p.replicateKey;           // only the secret; logo/title prefs stay
+        localStorage.setItem(PREF_KEY, JSON.stringify(p));
+      }
+    } catch(e) {}
+    location.replace('/login.html'); // a failed logout still leaves the browser
+  }
+}
+
 let mediaItems = [], videoBlob = null, selectedFX = 'tectonic', finalBlob = null, generatedVideoURL = null, combinedAudioBlob = null;
 let frameOverlayImg   = null;
 let logoOverlayImg    = null;
@@ -1117,6 +1208,7 @@ async function captureVoiceAnchor(key, blob, text, uploader) {
       console.log('[VoxCPM2] Voice anchor set for', key);
     }
   } catch(e) {
+    if (e.status === 401) throw e;   // a dead session is not "continue unlocked"
     console.warn('[VoxCPM2] Voice anchor capture failed, continuing unlocked:', e);
   }
 }
@@ -1125,6 +1217,8 @@ async function captureVoiceAnchor(key, blob, text, uploader) {
 async function uploadRefWav(file) {
   const fd = new FormData(); fd.append('files', file);
   const up = await fetch(API+'/gradio_api/upload', {method:'POST', body:fd});
+  // A null ref silently falls back to the default voice, so a 401 must throw.
+  if (handleAuthFailure(up)) throw sessionExpiredError();
   if (!up.ok) return null;
   return {path:(await up.json())[0], meta:{_type:'gradio.FileData'}, orig_name:file.name};
 }
@@ -2229,7 +2323,12 @@ async function previewClipVoice(i) {
     const url  = await callVoxCPM2(text, ctrl, refWav, usePrompt, promptTxt,
                    parseFloat(document.getElementById('cfg-val').value), true, false,
                    parseInt(document.getElementById('dit-steps').value));
-    const blob = await (await fetch(url, {mode:'cors', credentials:'omit'})).blob();
+    // Same-origin and session-gated now, so the cookie has to ride along.
+    const r = await fetch(url, {mode:'cors', credentials:'same-origin'});
+    if (handleAuthFailure(r)) throw sessionExpiredError();
+    // A 401 body is JSON: .blob() would happily hand that to <audio>.
+    if (!r.ok) throw new Error('Audio fetch failed (' + r.status + ')');
+    const blob = await r.blob();
     // First render of this voice becomes its anchor for all later clips.
     await captureVoiceAnchor(anchorKey, blob, text, uploadRefWav);
     const obj  = URL.createObjectURL(blob);
@@ -2288,6 +2387,7 @@ async function checkAPI() {
   el.innerHTML = '<div class="status-dot spin"></div> Checking...';
   try {
     const r = await fetch(API+'/gradio_api/info', {signal: AbortSignal.timeout(5000)});
+    if (handleAuthFailure(r)) return;   // expired session, not a dead engine
     if (r.ok) { el.className='status-badge status-done'; el.innerHTML='<div class="status-dot"></div> Connected'; }
     else throw new Error();
   } catch(e) { el.className='status-badge status-err'; el.innerHTML='<div class="status-dot"></div> Offline'; }
@@ -2313,7 +2413,8 @@ async function callVoxCPM2(segText, ctrl, refWav, usePrompt, promptText, cfgVal,
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(payload)
   });
-  if (!initRes.ok) throw new Error('API submit failed (' + initRes.status + '): ' + await initRes.text());
+  if (handleAuthFailure(initRes)) throw new Error('Session expired — redirecting to sign in');
+  if (!initRes.ok) throw engineError(initRes, await initRes.text());
 
   const initJson = await initRes.json();
   const event_id = initJson.event_id;
@@ -2321,7 +2422,8 @@ async function callVoxCPM2(segText, ctrl, refWav, usePrompt, promptText, cfgVal,
 
   // Step 2: stream SSE result
   const evtRes = await fetch(API + '/gradio_api/call/generate/' + event_id);
-  if (!evtRes.ok) throw new Error('SSE stream failed: ' + evtRes.status);
+  if (handleAuthFailure(evtRes)) throw new Error('Session expired — redirecting to sign in');
+  if (!evtRes.ok) throw engineError(evtRes);
 
   const reader = evtRes.body.getReader();
   const dec    = new TextDecoder();
@@ -2460,11 +2562,16 @@ async function generateVoice() {
       try {
         const fd = new FormData(); fd.append('files', file);
         const uploadRes = await fetch(API+'/gradio_api/upload', {method:'POST', body:fd});
+        // A null ref silently renders the default voice, so a 401 must not be cached.
+        if (handleAuthFailure(uploadRes)) throw sessionExpiredError();
         if (uploadRes.ok) {
           const paths = await uploadRes.json();
           refWav = {path: paths[0], meta: {_type:'gradio.FileData'}, orig_name: file.name};
         }
-      } catch(e) { console.warn('Ref upload failed for', file.name, e); }
+      } catch(e) {
+        if (e.status === 401) throw e;
+        console.warn('Ref upload failed for', file.name, e);
+      }
       uploadCache.set(file, refWav);
       return refWav;
     }
@@ -2474,6 +2581,7 @@ async function generateVoice() {
     const voiceLock = document.getElementById('voicelock-toggle').classList.contains('on');
 
     // Generate each segment sequentially, each with its own voice clone if set
+    let failedClips = 0;
     for (let i = 0; i < n; i++) {
       const segText  = segments[i];
       const assigned = clipVoices[i];                       // clone File | Khmer persona | undefined
@@ -2524,9 +2632,11 @@ async function generateVoice() {
       }
 
       // Fetch blob with CORS + full error handling
-      let blob, blobURL;
+      let blob, blobURL, fetchFailed = null;
       try {
-        const r = await fetch(audioURL, { mode: 'cors', credentials: 'omit' });
+        // Same-origin and session-gated now, so the cookie has to ride along.
+        const r = await fetch(audioURL, { mode: 'cors', credentials: 'same-origin' });
+        if (handleAuthFailure(r)) throw sessionExpiredError();
         if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
         blob    = await r.blob();
         if (blob.size === 0) throw new Error('Empty audio response');
@@ -2534,9 +2644,13 @@ async function generateVoice() {
         console.log('[VoxCPM2] Clip', i+1, 'fetched OK, size:', blob.size, 'blobURL:', blobURL);
       } catch(fetchErr) {
         console.error('[VoxCPM2] Blob fetch failed:', fetchErr, 'URL was:', audioURL);
-        // Fallback: use audioURL directly and let browser try
+        if (fetchErr.status === 401) throw fetchErr; // dead session: stop, don't fake a clip
+        // Fallback: use audioURL directly and let browser try — but with no audio
+        // data this clip has failed, so it must not be painted as done.
         blob    = new Blob([], {type:'audio/wav'});
         blobURL = audioURL; // direct URL fallback
+        fetchFailed = fetchErr;
+        failedClips++;
       }
       generatedSegments.push({text: segText, url: audioURL, blob, blobURL});
 
@@ -2545,10 +2659,10 @@ async function generateVoice() {
       if (voiceLock) await captureVoiceAnchor(lockKey, blob, segText, getRefWav);
 
       // Update card
-      card.style.borderColor = 'var(--green)';
+      card.style.borderColor = fetchFailed ? 'var(--red)' : 'var(--green)';
       card.style.borderWidth  = '1px';
-      st.className = 'status-badge status-done';
-      st.innerHTML = '<div class="status-dot"></div>Done';
+      st.className = 'status-badge status-' + (fetchFailed ? 'err' : 'done');
+      st.innerHTML = `<div class="status-dot"></div>${fetchFailed ? 'Failed' : 'Done'}`;
       const audioEl = document.createElement('audio');
       audioEl.controls = true;
       audioEl.style.cssText = 'width:100%;border-radius:6px;margin-bottom:4px';
@@ -2570,7 +2684,9 @@ async function generateVoice() {
     }
 
     // All segments done
-    setVProg(100, `All ${n} clip${n>1?'s':''} generated!`);
+    setVProg(100, failedClips
+      ? `${n - failedClips} of ${n} clip${n>1?'s':''} generated · ${failedClips} failed`
+      : `All ${n} clip${n>1?'s':''} generated!`);
     document.getElementById('audio-actions').style.display = 'flex';
     document.getElementById('audio-meta').textContent =
       `${n} segment${n>1?'s':''} · ${Math.round(generatedSegments.reduce((a,s)=>a+s.blob.size,0)/1024)}KB total`;
@@ -2585,6 +2701,10 @@ async function generateVoice() {
   } catch(e) {
     setVoiceStatus('err', 'Error: ' + e.message);
     setVProg(0, 'Failed — ' + e.message);
+    // Leave no spinner behind: the Output panel is what the user watches.
+    const outSt = document.getElementById('output-status');
+    outSt.className = 'status-badge status-err';
+    outSt.innerHTML = '<div class="status-dot"></div>Failed';
     console.error('VoxCPM2 error:', e);
   }
 
@@ -3199,6 +3319,7 @@ function loadSettings() {
 }
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
+loadSession();
 loadSettings();
 renderKhmerVoiceTags();
 analyzeText();

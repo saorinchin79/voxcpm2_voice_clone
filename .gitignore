@@ -7,3 +7,8 @@ app_local.py
 venv/
 *.log
 _tmp/
+users.json
+.sessions.json
+.seed_users.json
+seed-credentials-*.txt
+*.json.lock

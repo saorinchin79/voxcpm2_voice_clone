@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex, nofollow">
+<title>Sign in · VoxCPM2 Studio</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9' fill='%237c6ef7'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin="anonymous">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Suwannaphum:wght@100;300;400;700;900&display=swap" rel="stylesheet" crossorigin="anonymous">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #18181f;
+    --bg4: #1e1e28;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.15);
+    --accent: #7c6ef7;
+    --accent2: #a78bfa;
+    --accent3: #c4b5fd;
+    --gold: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --text: #f1f0ff;
+    --text2: #9e9bb8;
+    --text3: #5c5875;
+    /* Suwannaphum is a cross-origin font: keep a real fallback stack in case COEP blocks it */
+    --font: 'Suwannaphum', 'Khmer OS', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --radius: 12px;
+    --radius2: 20px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+
+  /* ACCENT GLOW + NOISE — same treatment as the studio shell */
+  body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(620px 420px at 50% 18%, rgba(124,110,247,0.22), transparent 70%),
+      radial-gradient(520px 380px at 82% 88%, rgba(167,139,250,0.12), transparent 72%); }
+  body::before { content: ''; position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.4; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); }
+
+  .shell { position: relative; z-index: 2; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.25rem; padding: 2rem 1rem; }
+
+  /* CARD */
+  .card { width: 100%; max-width: 400px; background: linear-gradient(180deg, rgba(24,24,31,0.92), rgba(17,17,24,0.88)); border: 1px solid var(--border); border-radius: var(--radius2); padding: 2rem 1.75rem 1.75rem; backdrop-filter: blur(20px); box-shadow: 0 30px 70px -24px rgba(0,0,0,0.85), 0 0 0 1px rgba(124,110,247,0.06), inset 0 1px 0 rgba(255,255,255,0.04); animation: cardIn 0.45s ease both; }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+  .logo { font-size: 1.1rem; font-weight: 800; letter-spacing: -0.02em; display: flex; align-items: center; gap: 8px; }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .title { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em; margin-top: 1.5rem; }
+  .subtitle { font-size: 0.82rem; color: var(--text2); margin-top: 6px; line-height: 1.5; }
+
+  /* FIELDS */
+  .input-wrap { margin-top: 1.25rem; }
+  .input-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; display: block; }
+  .field { position: relative; }
+  input[type=text], input[type=password] { width: 100%; background: var(--bg3); border: 1px solid var(--border2); color: var(--text); border-radius: var(--radius); padding: 12px 14px; font-family: var(--font); font-size: 0.92rem; transition: border-color 0.2s, box-shadow 0.2s, background 0.2s; }
+  input[type=password] { padding-right: 46px; letter-spacing: 0.06em; }
+  input::placeholder { color: var(--text3); letter-spacing: normal; }
+  input:hover { border-color: rgba(255,255,255,0.22); }
+  input:focus { outline: none; border-color: var(--accent); background: var(--bg4); box-shadow: 0 0 0 3px rgba(124,110,247,0.18); }
+  input:-webkit-autofill { -webkit-text-fill-color: var(--text); -webkit-box-shadow: 0 0 0 1000px var(--bg3) inset; caret-color: var(--text); }
+
+  .peek { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); width: 34px; height: 34px; border: none; border-radius: 8px; background: transparent; color: var(--text2); font-size: 0.95rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s, color 0.2s; }
+  .peek:hover { background: var(--bg4); color: var(--text); }
+  .peek:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .hint { font-size: 0.72rem; color: var(--gold); margin-top: 6px; }
+  .hint[hidden] { display: none; }
+
+  /* ERROR */
+  .error { display: flex; align-items: flex-start; gap: 8px; margin-top: 1rem; padding: 10px 12px; border-radius: 10px; font-size: 0.8rem; line-height: 1.45; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.35); color: #fca5a5; animation: shake 0.35s ease; }
+  .error[hidden] { display: none; }
+  .error.warn { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.35); color: #fcd34d; animation: none; }
+  .error-icon { flex: none; font-size: 0.85rem; line-height: 1.45; }
+  @keyframes shake { 0%,100% { transform: none; } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+  /* BUTTON */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 1.35rem; padding: 13px 20px; border-radius: 12px; font-family: var(--font); font-size: 0.9rem; font-weight: 700; cursor: pointer; transition: all 0.2s; border: none; background: var(--accent); color: white; box-shadow: 0 10px 26px -12px rgba(124,110,247,0.9); }
+  .btn:hover:not(:disabled) { background: var(--accent2); transform: translateY(-1px); }
+  .btn:active:not(:disabled) { transform: none; }
+  .btn:focus-visible { outline: 2px solid var(--accent3); outline-offset: 2px; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+  .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); border-top-color: #fff; animation: spin 0.7s linear infinite; }
+  .spinner[hidden] { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .foot { font-size: 0.72rem; color: var(--text3); text-align: center; line-height: 1.6; }
+  .foot-dot { color: var(--accent); }
+
+  @media (max-width: 420px) {
+    .shell { padding: 1.5rem 0.75rem; }
+    .card { padding: 1.6rem 1.25rem 1.4rem; border-radius: var(--radius); }
+    .title { font-size: 1.3rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card, .error, .logo-dot, .spinner { animation: none; }
+    .btn:hover:not(:disabled) { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <form class="card" id="login-form" method="post" action="/login" novalidate>
+    <div class="logo">
+      <div class="logo-dot"></div>
+      VoxCPM2 Studio
+    </div>
+
+    <h1 class="title">Sign in</h1>
+    <p class="subtitle">This studio is private. Enter your credentials to continue.</p>
+
+    <div class="input-wrap">
+      <label class="input-label" for="username">Username</label>
+      <div class="field">
+        <input type="text" id="username" name="username" placeholder="your name" autocomplete="username"
+               autocapitalize="none" autocorrect="off" spellcheck="false" required autofocus>
+      </div>
+    </div>
+
+    <div class="input-wrap">
+      <label class="input-label" for="password">Password</label>
+      <div class="field">
+        <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password"
+               autocapitalize="none" autocorrect="off" spellcheck="false" required>
+        <button type="button" class="peek" id="peek" aria-label="Show password" aria-pressed="false" title="Show password">👁</button>
+      </div>
+      <div class="hint" id="caps-hint" hidden>Caps Lock is on</div>
+    </div>
+
+    <div class="error" id="error" role="alert" aria-live="polite" hidden>
+      <span class="error-icon" aria-hidden="true">⚠</span>
+      <span id="error-text"></span>
+    </div>
+
+    <button type="submit" class="btn" id="submit">
+      <span class="spinner" id="spinner" hidden></span>
+      <span id="submit-label">Sign in</span>
+    </button>
+  </form>
+
+  <div class="foot"><span class="foot-dot">◆</span> VoxCPM2 Studio &middot; authorized users only</div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var FALLBACK_NEXT = '/studio.html';
+  // Only a same-origin absolute path: one leading slash, never "//host" or "/\host" (both are
+  // protocol-relative in browsers), no whitespace or control characters.
+  var SAFE_PATH = /^\/(?![\/\\])[^\s\x00-\x1f]*$/;
+
+  var form = document.getElementById('login-form');
+  var userEl = document.getElementById('username');
+  var passEl = document.getElementById('password');
+  var peekEl = document.getElementById('peek');
+  var capsEl = document.getElementById('caps-hint');
+  var errEl = document.getElementById('error');
+  var errTextEl = document.getElementById('error-text');
+  var btnEl = document.getElementById('submit');
+  var btnLabelEl = document.getElementById('submit-label');
+  var spinnerEl = document.getElementById('spinner');
+
+  var busy = false;
+  var countdownTimer = null;
+
+  function nextTarget() {
+    var raw = null;
+    try {
+      raw = new URLSearchParams(window.location.search).get('next');
+    } catch (e) {
+      raw = null;
+    }
+    if (!raw || raw.length > 512 || !SAFE_PATH.test(raw)) return FALLBACK_NEXT;
+    return raw;
+  }
+  var NEXT = nextTarget();
+
+  function showError(message, warn) {
+    errTextEl.textContent = message;
+    errEl.classList.toggle('warn', !!warn);
+    errEl.hidden = false;
+  }
+
+  function clearError() {
+    errEl.hidden = true;
+    errTextEl.textContent = '';
+    errEl.classList.remove('warn');
+  }
+
+  // One-shot marker written just before the post-login redirect. If we are back here with
+  // /api/me still unauthenticated, the browser accepted the 200 but dropped the cookie —
+  // otherwise the two pages bounce each other forever with nothing on screen.
+  var LOGIN_MARK = 'voxcpm_login_redirect';
+
+  function markLogin() {
+    try { window.sessionStorage.setItem(LOGIN_MARK, '1'); } catch (e) { /* storage blocked */ }
+  }
+
+  function takeLoginMark() {
+    try {
+      var seen = window.sessionStorage.getItem(LOGIN_MARK) !== null;
+      window.sessionStorage.removeItem(LOGIN_MARK);
+      return seen;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function setBusy(state) {
+    busy = state;
+    btnEl.disabled = state;
+    spinnerEl.hidden = !state;
+    btnLabelEl.textContent = state ? 'Signing in' : 'Sign in';
+    form.setAttribute('aria-busy', state ? 'true' : 'false');
+  }
+
+  function stopCountdown() {
+    if (countdownTimer !== null) {
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+    }
+  }
+
+  function startCountdown(seconds) {
+    stopCountdown();
+    var left = Math.min(Math.max(Math.floor(seconds), 1), 3600);
+    btnEl.disabled = true;
+    var tick = function () {
+      if (left <= 0) {
+        stopCountdown();
+        btnEl.disabled = false;
+        clearError();
+        passEl.focus();
+        return;
+      }
+      showError('Too many attempts — try again in ' + left + 's', true);
+      left -= 1;
+    };
+    tick();
+    countdownTimer = setInterval(tick, 1000);
+  }
+
+  function readJSON(res) {
+    // A proxy error page or an empty body must not surface as a raw exception.
+    return res.json().then(
+      function (data) { return { status: res.status, data: data }; },
+      function () { return { status: res.status, data: null }; }
+    );
+  }
+
+  // Already signed in? Skip the form entirely.
+  fetch('/api/me', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+    .then(readJSON)
+    .then(function (r) {
+      var bounced = takeLoginMark();
+      if (r.status === 200 && r.data && r.data.authenticated) {
+        window.location.replace(NEXT);
+        return;
+      }
+      if (bounced) {
+        showError('Signed in, but your browser did not keep the session cookie \u2014 enable cookies for this site and try again.');
+      }
+    })
+    .catch(function () { takeLoginMark(); /* offline or server down: just show the form */ });
+
+  peekEl.addEventListener('click', function () {
+    var reveal = passEl.type === 'password';
+    passEl.type = reveal ? 'text' : 'password';
+    peekEl.textContent = reveal ? '🙈' : '👁';
+    peekEl.setAttribute('aria-pressed', reveal ? 'true' : 'false');
+    peekEl.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+    peekEl.setAttribute('title', reveal ? 'Hide password' : 'Show password');
+    passEl.focus();
+  });
+
+  function capsCheck(ev) {
+    if (typeof ev.getModifierState !== 'function') return;
+    capsEl.hidden = !ev.getModifierState('CapsLock');
+  }
+  passEl.addEventListener('keydown', capsCheck);
+  passEl.addEventListener('keyup', capsCheck);
+  passEl.addEventListener('blur', function () { capsEl.hidden = true; });
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    if (busy || countdownTimer !== null) return;
+
+    var username = userEl.value.trim();
+    var password = passEl.value;
+    if (!username) { showError('Enter your username'); userEl.focus(); return; }
+    if (!password) { showError('Enter your password'); passEl.focus(); return; }
+
+    clearError();
+    setBusy(true);
+
+    fetch('/api/login', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: username, password: password })
+    })
+      .then(readJSON)
+      .then(function (r) {
+        if (r.status === 200 && r.data && r.data.ok) {
+          // Stay in the loading state: the navigation is the confirmation.
+          btnLabelEl.textContent = 'Signed in';
+          markLogin();
+          window.location.replace(NEXT);
+          return;
+        }
+
+        setBusy(false);
+
+        if (r.status === 429) {
+          var wait = r.data ? parseInt(r.data.retry_after, 10) : NaN;
+          startCountdown(isNaN(wait) || wait <= 0 ? 30 : wait);
+          return;
+        }
+        if (r.status === 401) {
+          showError('Invalid username or password');
+          passEl.value = '';
+          passEl.focus();
+          return;
+        }
+        if (r.status >= 500) {
+          showError('The server could not sign you in right now. Try again in a moment.');
+          return;
+        }
+        showError('Could not sign in. Please try again.');
+      })
+      .catch(function () {
+        setBusy(false);
+        showError('Cannot reach the server. Check your connection and try again.');
+      });
+  });
+
+  userEl.focus();
+})();
+</script>
+</body>
+</html>
