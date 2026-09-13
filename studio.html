@@ -2395,20 +2395,18 @@ async function checkAPI() {
 
 // ─── SINGLE VoxCPM2 API CALL ─────────────────────────────────────────────────
 async function callVoxCPM2(segText, ctrl, refWav, usePrompt, promptText, cfgVal, doNorm, denoise, ditSteps) {
+  // Positional form, not the named-argument route (/gradio_api/call/v2/generate).
+  // Gradio marks an input "required" when its component carries no default value, and
+  // gr.Audio has none — so the named route rejects ref_wav: null with
+  // "No value provided for required argument: ref_wav" and every generation that is not
+  // a voice clone 500s. The positional array accepts null, and its order is exactly the
+  // inputs=[...] list on run_btn.click in app.py.
   const payload = {
-    text: segText,
-    control_instruction: ctrl,
-    ref_wav: refWav,
-    use_prompt_text: usePrompt,
-    prompt_text_value: promptText,
-    cfg_value: cfgVal,
-    do_normalize: doNorm,
-    denoise: denoise,
-    dit_steps: ditSteps
+    data: [segText, ctrl, refWav, usePrompt, promptText, cfgVal, doNorm, denoise, ditSteps]
   };
 
   // Step 1: submit job
-  const initRes = await fetch(API + '/gradio_api/call/v2/generate', {
+  const initRes = await fetch(API + '/gradio_api/call/generate', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(payload)

@@ -101,6 +101,15 @@ class SecureHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
         self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
+        # A tab left open across a deploy otherwise keeps running the previous JS. That
+        # bit once already: pre-auth studio.html has no 401 handling, so an expired
+        # session surfaced as a bogus "engine Offline" badge instead of a login bounce.
+        # Only the two entry-point documents revalidate; assets stay cacheable.
+        try:
+            if self._url_path().endswith('.html'):
+                self.send_header('Cache-Control', 'no-store, must-revalidate')
+        except Exception:
+            pass
         super().end_headers()
 
     def log_message(self, format, *args):
